@@ -1,0 +1,3095 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CDMS - Customs Compliance, Data Reconciliation & Audit Risk System</title>
+  
+  <!-- Fonts: Inter / Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            navy: {
+              50: '#f0f4f8',
+              100: '#d9e2ec',
+              500: '#204060',
+              700: '#102a43',
+              800: '#0b1f33',
+              900: '#061321',
+            }
+          }
+        }
+      }
+    }
+    /* CR-02 lightweight presentation layer: line-level traceability, VN/EN and purpose segregation */
+    const CR02_I18N = {
+      vi: { traceTitle: 'CR-02 · Truy vết chi tiết & phân luồng hàng tồn', traceSubtitle: 'Đối chiếu theo Tờ khai + Nhà cung cấp/MST + Mã hàng, thay vì chỉ gộp theo mã.', loadDemo: 'Nạp tình huống demo', export: 'Xuất báo cáo', viewProduction: 'A · Sản xuất (152/BOM)', viewCommercial: 'B · Thương mại (156)', viewAsset: 'C · Tài sản (153/211)', uploadHint: 'Mẫu import: ERP Goods Receipt + VNACCS Declaration + Issue / Disposal Log', declNo: 'Tờ khai HQ', supplier: 'Nhà cung cấp / MST', partNo: 'Mã hàng', account: 'TK', purpose: 'Mục đích NK', importQty: 'SL nhập', issueQty: 'SL xuất/dùng', evidence: 'Chứng từ luồng', riskStatus: 'Trạng thái rủi ro', matched: 'Khớp chứng từ', review: 'Cần rà soát', critical: 'Rủi ro cao · Thiếu A42', total: 'Dòng theo dõi', clean: 'Khớp luồng', flagged: 'Cảnh báo rủi ro', exposure: 'SL cần xử lý', noAlert: 'Không có cảnh báo sai mục đích trong luồng này.', alert: 'PHÁT HIỆN SAI MỤC ĐÍCH: hàng miễn thuế {code} đã xuất {use} nhưng chưa có tờ khai chuyển mục đích A42.', footnote: 'Bộ khóa truy vết: Số tờ khai + Nhà cung cấp/MST + Mã hàng. Dữ liệu demo chạy hoàn toàn trong trình duyệt.' },
+      en: { traceTitle: 'CR-02 · Line-level traceability & inventory segregation', traceSubtitle: 'Match by Declaration + Supplier/Tax ID + Part Number, not aggregate codes alone.', loadDemo: 'Load demo scenario', export: 'Export report', viewProduction: 'A · Production (152/BOM)', viewCommercial: 'B · Commercial (156)', viewAsset: 'C · Assets (153/211)', uploadHint: 'Import model: ERP Goods Receipt + VNACCS Declaration + Issue / Disposal Log', declNo: 'Customs declaration', supplier: 'Supplier / Tax ID', partNo: 'Part number', account: 'Account', purpose: 'Import purpose', importQty: 'Imported qty', issueQty: 'Issued / used qty', evidence: 'Flow evidence', riskStatus: 'Risk status', matched: 'Document matched', review: 'Review required', critical: 'High risk · A42 missing', total: 'Tracked lines', clean: 'Flow matched', flagged: 'Risk flags', exposure: 'Qty to remediate', noAlert: 'No purpose-mismatch alert in this stream.', alert: 'PURPOSE MISMATCH: duty-free {code} goods were issued for {use} without an A42 purpose-amendment declaration.', footnote: 'Traceability key: Declaration number + Supplier/Tax ID + Part number. Demo data runs entirely in the browser.' }
+    };
+
+    // Translation catalogue for the existing MVP navigation and dashboard labels.
+    // New screens use data-home/data-cr; this lightweight map keeps legacy tabs bilingual without duplicating markup.
+    const LEGACY_I18N = {
+      vi: {
+        '1. Đối Chiếu Tồn Kho & BOM (1:N)': '1. Đối Chiếu Tồn Kho & BOM (1:N)', '2. BCQT & Rủi Ro PCA 5 Năm': '2. BCQT & Rủi Ro PCA 5 Năm', '3. Tính Tiền Chậm Nộp & Tạm Ứng': '3. Tính Tiền Chậm Nộp & Tạm Ứng', '4. SLA Pháp Lý & Tạo Đơn Khiếu Nại': '4. SLA Pháp Lý & Tạo Đơn Khiếu Nại', '5. Nhật Ký Kiểm Toán (Audit Trail)': '5. Nhật Ký Kiểm Toán (Audit Trail)',
+        'Nạp Data Mẫu Demo (1-to-N)': 'Nạp Data Mẫu Demo (1-to-N)', 'Thực Hiện Đối Chiếu': 'Thực Hiện Đối Chiếu', 'Xuất Báo Cáo Excel': 'Xuất Báo Cáo Excel', 'Tổng cụm đối soát': 'Tổng cụm đối soát', 'Khớp hoàn toàn': 'Khớp hoàn toàn', 'Chênh lệch Tồn (Δ)': 'Chênh lệch Tồn (Δ)', 'BOM Vượt Dung Sai': 'BOM Vượt Dung Sai', 'Mã chưa ánh xạ': 'Mã chưa ánh xạ',
+        'Mã Hải Quan': 'Mã Hải Quan', 'Mã ERP Nội Bộ (1:N)': 'Mã ERP Nội Bộ (1:N)', 'Tên Nguyên Vật Liệu': 'Tên Nguyên Vật Liệu', 'Tổng Tồn ERP (Σ)': 'Tổng Tồn ERP (Σ)', 'Tồn Hải Quan': 'Tồn Hải Quan', 'Chênh Lệch (Δ)': 'Chênh Lệch (Δ)', 'BOM Đăng Ký': 'BOM Đăng Ký', 'BOM Thực Tế': 'BOM Thực Tế', 'Trạng Thái Rủi Ro': 'Trạng Thái Rủi Ro', 'Hành Động': 'Hành Động',
+        'Thời Hạn Nộp BCQT (Mẫu 15)': 'Thời Hạn Nộp BCQT (Mẫu 15)', '4 Hạng Mục Rủi Ro Cao Cần Xử Lý Trước Nộp BCQT': '4 Hạng Mục Rủi Ro Cao Cần Xử Lý Trước Nộp BCQT', 'Tính Tiền Chậm Nộp & Phạt Vi Phạm': 'Tính Tiền Chậm Nộp & Phạt Vi Phạm', 'Theo Dõi Thời Hiệu Pháp Lý': 'Theo Dõi Thời Hiệu Pháp Lý', 'Nhật Ký Kiểm Toán Bất Biến': 'Nhật Ký Kiểm Toán Bất Biến'
+      },
+      en: {
+        '1. Đối Chiếu Tồn Kho & BOM (1:N)': '1. Inventory & BOM Reconciliation (1:N)', '2. BCQT & Rủi Ro PCA 5 Năm': '2. BCQT & 5-Year PCA Risk', '3. Tính Tiền Chậm Nộp & Tạm Ứng': '3. Late Payment & Partial Payment', '4. SLA Pháp Lý & Tạo Đơn Khiếu Nại': '4. Legal SLA & Petition Builder', '5. Nhật Ký Kiểm Toán (Audit Trail)': '5. Audit Trail',
+        'Nạp Data Mẫu Demo (1-to-N)': 'Load Demo Data (1-to-N)', 'Thực Hiện Đối Chiếu': 'Run Reconciliation', 'Xuất Báo Cáo Excel': 'Export Excel Report', 'Tổng cụm đối soát': 'Reconciliation groups', 'Khớp hoàn toàn': 'Fully matched', 'Chênh lệch Tồn (Δ)': 'Inventory variance (Δ)', 'BOM Vượt Dung Sai': 'BOM over tolerance', 'Mã chưa ánh xạ': 'Unmapped items',
+        'Mã Hải Quan': 'Customs code', 'Mã ERP Nội Bộ (1:N)': 'Internal ERP code (1:N)', 'Tên Nguyên Vật Liệu': 'Material description', 'Tổng Tồn ERP (Σ)': 'Total ERP stock (Σ)', 'Tồn Hải Quan': 'Customs stock', 'Chênh Lệch (Δ)': 'Variance (Δ)', 'BOM Đăng Ký': 'Registered BOM', 'BOM Thực Tế': 'Actual BOM', 'Trạng Thái Rủi Ro': 'Risk status', 'Hành Động': 'Action',
+        'Thời Hạn Nộp BCQT (Mẫu 15)': 'BCQT Filing Deadline (Form 15)', '4 Hạng Mục Rủi Ro Cao Cần Xử Lý Trước Nộp BCQT': '4 High-Risk Items Before BCQT Filing', 'Tính Tiền Chậm Nộp & Phạt Vi Phạm': 'Late Payment Interest & Penalty', 'Theo Dõi Thời Hiệu Pháp Lý': 'Legal Limitation Tracking', 'Nhật Ký Kiểm Toán Bất Biến': 'Immutable Audit Trail'
+      }
+    };
+
+    const HOME_I18N = {
+      vi: { navHome: '0. Trung Tâm Tuân Thủ', title: 'Trung tâm điều hành tuân thủ', subtitle: 'Tổng hợp mức độ sẵn sàng BCQT, truy vết hồ sơ PCA và việc cần xử lý trước khi cơ quan Hải quan yêu cầu giải trình.', openWorkbench: 'Mở bàn làm việc đối chiếu', riskRegister: 'Sổ đăng ký rủi ro ưu tiên', screening: 'Sàng lọc rủi ro · Cần chuyên gia rà soát', risk: 'Rủi ro', scope: 'Phạm vi', owner: 'Phụ trách', due: 'Hạn xử lý', status: 'Trạng thái', pcaVault: 'Kho hồ sơ PCA 5 năm', pcaHint: 'Bấm một tờ khai để xem bộ chứng từ sẵn sàng.', readiness: 'Mức sẵn sàng BCQT', openRisks: 'Rủi ro cần xử lý', evidenceGap: 'Khoảng trống chứng từ', taxExposure: 'Rủi ro thuế ước tính', ready: 'Sẵn sàng', inProgress: 'Đang xử lý', critical: 'Cần ưu tiên', viewEvidence: 'Xem hồ sơ', declaration: 'Tờ khai', evidencePack: 'Bộ hồ sơ chứng minh', available: 'Đã có', missing: 'Còn thiếu', nextAction: 'Việc cần làm tiếp theo', a42Risk: 'Hàng E21/E31 dùng sai mục đích, thiếu A42', bomRisk: 'Định mức/BOM vượt dung sai', evidenceRisk: 'Thiếu chứng từ trong cửa sổ PCA 5 năm', commercial: 'Luồng thương mại', production: 'Luồng SXXK', pca: 'Hồ sơ PCA', customsLead: 'Trưởng phòng XNK', chiefAccountant: 'Kế toán trưởng', legal: 'Pháp chế', resolveA42: 'Rà soát khai bổ sung/chuyển mục đích và chứng từ A42.', resolveBom: 'Đối chiếu định mức, phê duyệt giải trình và khóa snapshot BCQT.', resolveEvidence: 'Bổ sung catalogue, C/O, vận đơn và chứng từ thanh toán.', hsDesk: 'Bàn rủi ro HS & xuất xứ', hsHint: 'Sàng lọc chứng cứ phân loại và xuất xứ.', valueDesk: 'Trị giá hải quan & thuế', valueHint: 'Khoản điều chỉnh tiềm năng cần xác minh.', matrixDesk: 'Ma trận đầy đủ chứng từ', matrixHint: 'Khoảng trống hồ sơ theo tờ khai.', catalogue: 'Thiếu catalogue kỹ thuật', origin: 'C/O và nước xuất xứ chưa nhất quán', royalty: 'Phí bản quyền cần rà soát trị giá', relatedParty: 'Giá giao dịch liên kết cần chứng minh', docs: 'chứng từ còn thiếu', reviewNow: 'Rà soát ngay' },
+      en: { navHome: '0. Compliance Center', title: 'Compliance Command Center', subtitle: 'A single view of BCQT readiness, PCA evidence traceability, and actions due before Customs requests an explanation.', openWorkbench: 'Open reconciliation workbench', riskRegister: 'Priority risk register', screening: 'Risk screening · Requires specialist review', risk: 'Risk', scope: 'Scope', owner: 'Owner', due: 'Due date', status: 'Status', pcaVault: 'PCA 5-Year Evidence Vault', pcaHint: 'Select a declaration to inspect the evidence pack.', readiness: 'BCQT readiness', openRisks: 'Open risks', evidenceGap: 'Evidence gaps', taxExposure: 'Estimated tax exposure', ready: 'Ready', inProgress: 'In progress', critical: 'Priority', viewEvidence: 'View evidence', declaration: 'Declaration', evidencePack: 'Evidence pack', available: 'Available', missing: 'Missing', nextAction: 'Next action', a42Risk: 'E21/E31 goods used for another purpose without A42', bomRisk: 'BOM consumption exceeds tolerance', evidenceRisk: 'Evidence missing within the 5-year PCA window', commercial: 'Commercial stream', production: 'Manufacturing stream', pca: 'PCA evidence', customsLead: 'Import-export lead', chiefAccountant: 'Chief accountant', legal: 'Legal counsel', resolveA42: 'Review purpose amendment and the supporting A42 evidence.', resolveBom: 'Reconcile BOM, approve explanation and lock the BCQT snapshot.', resolveEvidence: 'Collect catalogue, C/O, transport and payment evidence.', hsDesk: 'HS & Origin Risk Desk', hsHint: 'Screening of classification and origin evidence.', valueDesk: 'Customs Valuation & Tax', valueHint: 'Potential adjustment items requiring validation.', matrixDesk: 'Document Completeness Matrix', matrixHint: 'Evidence gaps by customs declaration.', catalogue: 'Technical catalogue missing', origin: 'C/O and country of origin inconsistent', royalty: 'Royalty requires customs-value review', relatedParty: 'Related-party price needs support', docs: 'documents missing', reviewNow: 'Review now' }
+    };
+    Object.assign(LEGACY_I18N.vi, {
+      'Module 1: Động Cơ Đối Chiếu Dữ Liệu Đa Nguồn & Ánh Xạ 1-to-N': 'Module 1: Động Cơ Đối Chiếu Dữ Liệu Đa Nguồn & Ánh Xạ 1-to-N', 'Sổ Kho Kế Toán ERP (TK 152)': 'Sổ Kho Kế Toán ERP (TK 152)', 'Tờ Khai Hải Quan VNACCS': 'Tờ Khai Hải Quan VNACCS', 'Bảng Ánh Xạ Mã & Định Mức (BOM)': 'Bảng Ánh Xạ Mã & Định Mức (BOM)', 'Kiểm Tra Sau Thông Quan (PCA) - Checklist 5 Năm Theo Điều 78 Luật Hải Quan 2014': 'Kiểm Tra Sau Thông Quan (PCA) - Checklist 5 Năm Theo Điều 78 Luật Hải Quan 2014', 'Module 3: Công Cụ Đo Lường Rủi Ro Tài Chính & Tiền Chậm Nộp': 'Module 3: Công Cụ Đo Lường Rủi Ro Tài Chính & Tiền Chậm Nộp', 'Tổng Nghĩa Vụ Tài Chính Phải Nộp Còn Lại': 'Tổng Nghĩa Vụ Tài Chính Phải Nộp Còn Lại', 'Module 4: Bộ Đếm Thời Hiệu Khiếu Nại (SLA) & Tạo Văn Bản Pháp Lý Tự Động': 'Module 4: Bộ Đếm Thời Hiệu Khiếu Nại (SLA) & Tạo Văn Bản Pháp Lý Tự Động', 'Module 5: Nhật Ký Kiểm Toán Bất Biến (Audit Trail Log)': 'Module 5: Nhật Ký Kiểm Toán Bất Biến (Audit Trail Log)', 'Thời Điểm (UTC+7)': 'Thời Điểm (UTC+7)', 'Loại Hành Vi': 'Loại Hành Vi', 'Lý Do Giải Trình (Audit Justification)': 'Lý Do Giải Trình (Audit Justification)'
+    });
+    Object.assign(LEGACY_I18N.en, {
+      'Module 1: Động Cơ Đối Chiếu Dữ Liệu Đa Nguồn & Ánh Xạ 1-to-N': 'Module 1: Multi-Source Reconciliation & 1-to-N Mapping Engine', 'Sổ Kho Kế Toán ERP (TK 152)': 'ERP Inventory Ledger (Account 152)', 'Tờ Khai Hải Quan VNACCS': 'VNACCS Customs Declarations', 'Bảng Ánh Xạ Mã & Định Mức (BOM)': 'Part Mapping & BOM Table', 'Kiểm Tra Sau Thông Quan (PCA) - Checklist 5 Năm Theo Điều 78 Luật Hải Quan 2014': 'Post-Clearance Audit (PCA) – 5-Year Checklist', 'Module 3: Công Cụ Đo Lường Rủi Ro Tài Chính & Tiền Chậm Nộp': 'Module 3: Financial Risk & Late Payment Calculator', 'Tổng Nghĩa Vụ Tài Chính Phải Nộp Còn Lại': 'Total Outstanding Financial Obligation', 'Module 4: Bộ Đếm Thời Hiệu Khiếu Nại (SLA) & Tạo Văn Bản Pháp Lý Tự Động': 'Module 4: Legal Limitation Clock & Document Builder', 'Module 5: Nhật Ký Kiểm Toán Bất Biến (Audit Trail Log)': 'Module 5: Immutable Audit Trail Log', 'Thời Điểm (UTC+7)': 'Timestamp (UTC+7)', 'Loại Hành Vi': 'Action Type', 'Lý Do Giải Trình (Audit Justification)': 'Justification'
+    });
+    function homeText(key) { return HOME_I18N[AppState.language][key] || key; }
+    function crText(key) { return CR02_I18N[AppState.language][key] || key; }
+    const HOME_RISKS = [
+      { risk: 'a42Risk', scope: 'commercial', owner: 'customsLead', due: '2026-09-15', status: 'critical', action: 'resolveA42' },
+      { risk: 'bomRisk', scope: 'production', owner: 'chiefAccountant', due: '2026-09-20', status: 'inProgress', action: 'resolveBom' },
+      { risk: 'evidenceRisk', scope: 'pca', owner: 'legal', due: '2026-09-30', status: 'inProgress', action: 'resolveEvidence' }
+    ];
+    const HOME_DECLARATIONS = [
+      { no: '103876543210', stream: 'commercial', items: 4, ready: ['Commercial invoice', 'Packing list', 'Domestic sales invoice'], missing: ['A42 purpose amendment'], action: 'resolveA42' },
+      { no: '103456789012', stream: 'production', items: 12, ready: ['Declaration', 'BOM', 'Goods receipt'], missing: ['Supplier payment advice'], action: 'resolveBom' },
+      { no: '104222333444', stream: 'pca', items: 2, ready: ['Asset register', 'Internal issue slip'], missing: ['A42 / asset disposal decision'], action: 'resolveA42' }
+    ];
+    function homeStatusBadge(status) { const classes = { ready: 'bg-emerald-100 text-emerald-800', inProgress: 'bg-amber-100 text-amber-800', critical: 'bg-rose-600 text-white' }; return `<span class="px-2 py-1 rounded-full text-[10px] font-bold ${classes[status]}">${homeText(status)}</span>`; }
+    function renderComplianceHome() {
+      const critical = HOME_RISKS.filter(r => r.status === 'critical').length;
+      const kpis = [[homeText('readiness'), '82%', 'text-emerald-600'], [homeText('openRisks'), HOME_RISKS.length, 'text-rose-600'], [homeText('evidenceGap'), HOME_DECLARATIONS.reduce((n, d) => n + d.missing.length, 0), 'text-amber-600'], [homeText('taxExposure'), '₫ 428M', 'text-slate-800']];
+      const kpiTarget = document.getElementById('home-kpis'); if (!kpiTarget) return;
+      kpiTarget.innerHTML = kpis.map(([label, value, color]) => `<div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm"><p class="text-[10px] uppercase font-bold text-slate-500">${label}</p><p class="mt-1 text-2xl font-extrabold ${color}">${value}</p></div>`).join('');
+      document.getElementById('home-risk-tbody').innerHTML = HOME_RISKS.map(r => `<tr class="hover:bg-slate-50"><td class="p-3 font-semibold text-slate-800">${homeText(r.risk)}</td><td class="p-3 text-slate-600">${homeText(r.scope)}</td><td class="p-3 text-slate-600">${homeText(r.owner)}</td><td class="p-3 font-mono text-slate-600">${r.due}</td><td class="p-3">${homeStatusBadge(r.status)}</td></tr>`).join('');
+      document.getElementById('home-declaration-list').innerHTML = HOME_DECLARATIONS.map((d, index) => `<button onclick="showEvidencePack(${index})" class="w-full text-left p-4 hover:bg-slate-50 flex items-center justify-between"><div><p class="font-mono font-bold text-slate-800">${d.no}</p><p class="text-[11px] text-slate-500">${homeText(d.stream)} · ${d.items} line items</p></div><span class="text-xs font-bold text-blue-700">${homeText('viewEvidence')} →</span></button>`).join('');
+      document.getElementById('home-hs-desk').innerHTML = [
+        ['85423100', 'IC-MCU-ARM32', 'catalogue', 'critical'], ['85176259', 'WIRELESS-MOD', 'origin', 'inProgress']
+      ].map(([hs, part, risk, status]) => `<div class="p-4"><div class="flex justify-between gap-2"><span class="font-mono font-bold">${hs}</span>${homeStatusBadge(status)}</div><p class="text-xs font-semibold mt-1">${part}</p><p class="text-[11px] text-rose-700 mt-1">${homeText(risk)}</p></div>`).join('');
+      document.getElementById('home-value-desk').innerHTML = [
+        ['103456789012', 'royalty', '₫ 180M', 'inProgress'], ['103876543210', 'relatedParty', '₫ 248M', 'critical']
+      ].map(([decl, risk, amount, status]) => `<div class="p-4"><div class="flex justify-between gap-2"><span class="font-mono font-bold">${decl}</span>${homeStatusBadge(status)}</div><p class="text-xs text-slate-700 mt-2">${homeText(risk)}</p><p class="text-xs font-extrabold text-slate-900 mt-1">${amount}</p></div>`).join('');
+      document.getElementById('home-matrix-desk').innerHTML = HOME_DECLARATIONS.map(d => `<div class="p-4 flex justify-between items-center"><div><p class="font-mono font-bold text-slate-800">${d.no}</p><p class="text-[11px] text-rose-700 mt-1">${d.missing.length} ${homeText('docs')}</p></div><button onclick="showEvidencePack(${HOME_DECLARATIONS.indexOf(d)})" class="text-xs font-bold text-blue-700">${homeText('reviewNow')} →</button></div>`).join('');
+    }
+    function showEvidencePack(index) {
+      const d = HOME_DECLARATIONS[index]; const panel = document.getElementById('home-evidence');
+      panel.classList.remove('hidden');
+      panel.innerHTML = `<div class="flex flex-col md:flex-row md:justify-between gap-4"><div><p class="text-xs text-slate-500">${homeText('declaration')}</p><h3 class="font-mono text-lg font-extrabold text-slate-900">${d.no}</h3></div>${homeStatusBadge(d.missing.length ? 'inProgress' : 'ready')}</div><div class="grid md:grid-cols-2 gap-4 mt-4"><div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200"><p class="font-bold text-emerald-800 text-xs">✓ ${homeText('available')}</p><ul class="mt-2 text-xs text-emerald-900 list-disc list-inside">${d.ready.map(x => `<li>${x}</li>`).join('')}</ul></div><div class="p-3 rounded-lg bg-rose-50 border border-rose-200"><p class="font-bold text-rose-800 text-xs">! ${homeText('missing')}</p><ul class="mt-2 text-xs text-rose-900 list-disc list-inside">${d.missing.map(x => `<li>${x}</li>`).join('')}</ul></div></div><div class="mt-4 text-xs p-3 bg-slate-50 border rounded-lg"><b>${homeText('nextAction')}:</b> ${homeText(d.action)}</div>`;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    function crNumber(value) { return Number(value || 0).toLocaleString(AppState.language === 'vi' ? 'vi-VN' : 'en-US'); }
+    function translateLegacyUi() {
+      const target = LEGACY_I18N[AppState.language];
+      const source = LEGACY_I18N[AppState.language === 'vi' ? 'en' : 'vi'];
+      const reverse = Object.fromEntries(Object.entries(source).map(([vi, en]) => [en, vi]));
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach(node => { const original = node.nodeValue; const trimmed = original.trim(); const viKey = reverse[trimmed] || trimmed; if (target[viKey] && target[viKey] !== trimmed) node.nodeValue = original.replace(trimmed, target[viKey]); });
+      if (AppState.reconciliationResults?.length) { renderReconciliationSummary(); renderReconciliationTable(); }
+    }
+    function translateCr02() {
+      document.documentElement.lang = AppState.language;
+      translateLegacyUi();
+      document.querySelectorAll('[data-home]').forEach(el => { el.textContent = homeText(el.dataset.home); });
+      document.querySelectorAll('[data-cr]').forEach(el => { el.textContent = crText(el.dataset.cr); });
+      document.getElementById('language-toggle-label').textContent = AppState.language === 'vi' ? 'VN / EN' : 'EN / VN';
+      renderCr02();
+      if (typeof renderComplianceHome === 'function') renderComplianceHome();
+    }
+    function toggleLanguage() { AppState.language = AppState.language === 'vi' ? 'en' : 'vi'; translateCr02(); showToast(AppState.language === 'vi' ? 'Đã chuyển sang Tiếng Việt' : 'Switched to English', 'success'); }
+    function loadCr02Demo(notify = true) {
+      AppState.cr02Lines = [
+        { stream: 'production', declaration: '103456789012', supplier: 'NXP Semiconductors / NL009876543B01', part: 'IC-MCU-ARM32', account: '152', purpose: 'E31 · SXXK', imported: 12000, issued: 11820, evidence: 'BOM FG-IOT-HUB-01', status: 'matched' },
+        { stream: 'production', declaration: '103456789012', supplier: 'NXP Semiconductors / NL009876543B01', part: 'CAP-ELEC-03', account: '152', purpose: 'E31 · SXXK', imported: 50000, issued: 48000, evidence: 'BOM variance +2.0%', status: 'review' },
+        { stream: 'commercial', declaration: '103987654321', supplier: 'Shenzhen Trading / CN91440300A1', part: 'USB-C-HUB-20W', account: '156', purpose: 'A11 · Commercial', imported: 2500, issued: 2380, evidence: 'Domestic sales invoice 000128', status: 'matched' },
+        { stream: 'commercial', declaration: '103876543210', supplier: 'Global Components / SG201812345K', part: 'WIRELESS-MOD', account: '156', purpose: 'E21 · Duty-free processing', imported: 5000, issued: 900, evidence: 'Domestic sales invoice 000147 · A42: —', status: 'critical', use: 'domestic commercial sale', code: 'E21' },
+        { stream: 'asset', declaration: '104111222333', supplier: 'Mori Seiki / JP987654321', part: 'CNC-NX4000', account: '211', purpose: 'G12 · Temporary import', imported: 1, issued: 1, evidence: 'Asset register FA-2026-008', status: 'matched' },
+        { stream: 'asset', declaration: '104222333444', supplier: 'KUKA Robotics / DE123456789', part: 'ROBOT-ARM-KR10', account: '153', purpose: 'E31 · Duty-free equipment', imported: 2, issued: 1, evidence: 'Internal consumption slip · A42: —', status: 'critical', use: 'internal consumption', code: 'E31' }
+      ];
+      AppState.cr02View = 'production';
+      translateCr02();
+      if (notify) { logAuditAction('CR02_DEMO_LOAD', 'Traceability & Purpose Segregation', 'Empty', '6 line-level records', 'MVP presentation scenario loaded'); showToast(AppState.language === 'vi' ? 'Đã nạp 6 dòng truy vết đa mục đích.' : 'Loaded 6 multi-purpose traceability lines.', 'success'); }
+    }
+    function setCr02View(view) { AppState.cr02View = view; renderCr02(); }
+    function statusBadge(status) {
+      const styles = { matched: 'bg-emerald-100 text-emerald-800', review: 'bg-amber-100 text-amber-800', critical: 'bg-rose-600 text-white' };
+      return `<span class="px-2 py-1 rounded-full text-[10px] font-bold ${styles[status]}">${crText(status)}</span>`;
+    }
+    function renderCr02() {
+      const lines = AppState.cr02Lines.filter(line => line.stream === AppState.cr02View);
+      const critical = lines.filter(line => line.status === 'critical');
+      const clean = lines.filter(line => line.status === 'matched').length;
+      const exposure = critical.reduce((sum, line) => sum + line.issued, 0);
+      document.querySelectorAll('[id^="cr02-btn-"]').forEach(btn => btn.className = 'px-3 py-1.5 rounded-md text-slate-600');
+      const active = document.getElementById(`cr02-btn-${AppState.cr02View}`); if (active) active.className = 'px-3 py-1.5 rounded-md bg-blue-600 text-white';
+      document.getElementById('cr02-kpis').innerHTML = [
+        [crText('total'), lines.length, 'text-slate-800'], [crText('clean'), clean, 'text-emerald-600'], [crText('flagged'), critical.length, critical.length ? 'text-rose-600' : 'text-emerald-600'], [crText('exposure'), crNumber(exposure), critical.length ? 'text-rose-600' : 'text-slate-800']
+      ].map(([label, value, color]) => `<div class="p-3 rounded-lg border border-slate-200 bg-slate-50"><p class="text-[10px] uppercase font-bold text-slate-500">${label}</p><p class="text-xl font-extrabold ${color}">${value}</p></div>`).join('');
+      document.getElementById('cr02-tbody').innerHTML = lines.map(line => `<tr class="hover:bg-slate-50"><td class="p-3 font-mono font-bold">${line.declaration}</td><td class="p-3">${line.supplier}</td><td class="p-3 font-mono">${line.part}</td><td class="p-3 font-bold">${line.account}</td><td class="p-3">${line.purpose}</td><td class="p-3 text-right font-mono">${crNumber(line.imported)}</td><td class="p-3 text-right font-mono">${crNumber(line.issued)}</td><td class="p-3 ${line.status === 'critical' ? 'text-rose-700 font-semibold' : ''}">${line.evidence}</td><td class="p-3">${statusBadge(line.status)}</td></tr>`).join('');
+      const banner = document.getElementById('cr02-risk-banner');
+      if (critical.length) { const risk = critical[0]; banner.className = 'mx-4 mb-4 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 p-3 text-xs font-semibold'; banner.textContent = crText('alert').replace('{code}', risk.code).replace('{use}', risk.use); }
+      else { banner.className = 'mx-4 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 p-3 text-xs'; banner.textContent = crText('noAlert'); }
+      document.getElementById('cr02-footnote').textContent = crText('footnote');
+      lucide.createIcons();
+    }
+    function exportCr02Report() {
+      const lines = AppState.cr02Lines;
+      if (!lines.length) return;
+      const t = CR02_I18N[AppState.language];
+      const data = lines.map(line => ({ [t.declNo]: line.declaration, [t.supplier]: line.supplier, [t.partNo]: line.part, [t.account]: line.account, [t.purpose]: line.purpose, [t.importQty]: line.imported, [t.issueQty]: line.issued, [t.evidence]: line.evidence, [t.riskStatus]: t[line.status] }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), AppState.language === 'vi' ? 'Truy_vet_chi_tiet' : 'Line_Traceability');
+      const risks = data.filter((_, index) => lines[index].status === 'critical');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(risks), AppState.language === 'vi' ? 'Canh_bao_A42' : 'A42_Risk_Flags');
+      XLSX.writeFile(wb, `CDMS_CR02_${AppState.language === 'vi' ? 'VN' : 'EN'}_Traceability.xlsx`);
+      showToast(AppState.language === 'vi' ? 'Đã xuất báo cáo truy vết CR-02.' : 'CR-02 traceability report exported.', 'success');
+    }
+  </script>
+
+  <!-- SheetJS CDN (XLSX parsing & generation) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- docx.js CDN (DOCX Petition Generator) -->
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-900 font-bold shadow">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-lg tracking-tight text-white">CDMS</span>
+            <span class="text-xs bg-amber-400/20 text-amber-300 font-semibold px-2 py-0.5 rounded border border-amber-400/30">Local MVP v2.0</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Customs Compliance, Data Reconciliation & Audit Risk System</p>
+        </div>
+      </div>
+
+      <!-- Security & Audit Indicator -->
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+          <span>100% Client-Side & Immutable Audit Trail</span>
+        </div>
+
+        <button onclick="quickLoadDemoData()" class="hidden md:flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+          <span>Nạp Data Mẫu Demo (1-to-N)</span>
+        </button>
+        <button onclick="toggleLanguage()" id="language-toggle" aria-label="Switch language" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded-lg text-xs font-extrabold transition">
+          <i data-lucide="languages" class="w-4 h-4 text-blue-300"></i>
+          <span id="language-toggle-label">VN / EN</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sub-navigation Tabs -->
+    <div class="bg-slate-800/90 border-t border-slate-700/60 px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-3 overflow-x-auto py-2">
+        <button onclick="switchTab('module0')" id="tab-btn-module0" class="tab-btn flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition whitespace-nowrap">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span data-home="navHome">0. Trung Tâm Tuân Thủ</span>
+        </button>
+        <button onclick="switchTab('module1')" id="tab-btn-module1" class="tab-btn active flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-semibold transition whitespace-nowrap bg-blue-600 text-white shadow-sm">
+          <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+          <span>1. Đối Chiếu Tồn Kho & BOM (1:N)</span>
+        </button>
+        <button onclick="switchTab('module2')" id="tab-btn-module2" class="tab-btn flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition whitespace-nowrap">
+          <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+          <span>2. BCQT & Rủi Ro PCA 5 Năm</span>
+        </button>
+        <button onclick="switchTab('module3')" id="tab-btn-module3" class="tab-btn flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition whitespace-nowrap">
+          <i data-lucide="calculator" class="w-4 h-4"></i>
+          <span>3. Tính Tiền Chậm Nộp & Tạm Ứng</span>
+        </button>
+        <button onclick="switchTab('module4')" id="tab-btn-module4" class="tab-btn flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition whitespace-nowrap">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>4. SLA Pháp Lý & Tạo Đơn Khiếu Nại</span>
+        </button>
+        <button onclick="switchTab('module5')" id="tab-btn-module5" class="tab-btn flex items-center space-x-2 px-3.5 py-2 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition whitespace-nowrap">
+          <i data-lucide="history" class="w-4 h-4"></i>
+          <span>5. Nhật Ký Kiểm Toán (Audit Trail)</span>
+          <span id="nav-audit-badge" class="ml-1 px-1.5 py-0.2 text-[10px] rounded-full bg-slate-700 text-amber-300 font-mono">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT AREA ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- ================= MODULE 0: COMPLIANCE COMMAND CENTER ================= -->
+    <section id="module0" class="tab-content hidden space-y-6">
+      <div class="rounded-xl p-6 text-white bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 shadow-lg">
+        <div class="flex flex-col lg:flex-row justify-between gap-5">
+          <div><div class="flex items-center gap-2"><i data-lucide="shield-check" class="w-6 h-6 text-amber-300"></i><h2 class="text-xl font-extrabold" data-home="title">Compliance Command Center</h2></div><p class="mt-2 text-sm text-slate-300 max-w-2xl" data-home="subtitle">Tổng hợp mức độ sẵn sàng BCQT, truy vết hồ sơ PCA và việc cần xử lý trước khi cơ quan Hải quan yêu cầu giải trình.</p></div>
+          <button onclick="switchTab('module1')" class="h-fit inline-flex items-center gap-2 px-4 py-2 bg-amber-400 hover:bg-amber-300 rounded-lg text-slate-950 font-bold text-xs"><i data-lucide="arrow-right" class="w-4 h-4"></i><span data-home="openWorkbench">Mở bàn làm việc đối chiếu</span></button>
+        </div>
+      </div>
+      <div id="home-kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div class="lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"><div class="p-4 border-b bg-slate-50 flex justify-between"><h3 class="font-bold text-slate-800" data-home="riskRegister">Sổ đăng ký rủi ro ưu tiên</h3><span class="text-[10px] font-bold text-slate-500" data-home="screening">Risk screening · Requires review</span></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-slate-100 text-slate-600"><tr><th class="p-3 text-left" data-home="risk">Rủi ro</th><th class="p-3 text-left" data-home="scope">Phạm vi</th><th class="p-3 text-left" data-home="owner">Phụ trách</th><th class="p-3 text-left" data-home="due">Hạn xử lý</th><th class="p-3 text-left" data-home="status">Trạng thái</th></tr></thead><tbody id="home-risk-tbody" class="divide-y divide-slate-100"></tbody></table></div></div>
+        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm"><div class="p-4 border-b bg-slate-50"><h3 class="font-bold text-slate-800" data-home="pcaVault">PCA 5-Year Evidence Vault</h3><p class="text-[11px] text-slate-500 mt-1" data-home="pcaHint">Bấm một tờ khai để xem bộ chứng từ sẵn sàng.</p></div><div id="home-declaration-list" class="divide-y divide-slate-100"></div></div>
+      </div>
+      <div id="home-evidence" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm p-5"></div>
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"><div class="p-4 bg-slate-50 border-b"><h3 class="font-bold text-slate-800" data-home="hsDesk">HS & Origin Risk Desk</h3><p class="text-[11px] text-slate-500 mt-1" data-home="hsHint">Screening of classification and origin evidence.</p></div><div id="home-hs-desk" class="divide-y divide-slate-100"></div></div>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"><div class="p-4 bg-slate-50 border-b"><h3 class="font-bold text-slate-800" data-home="valueDesk">Customs Valuation & Tax</h3><p class="text-[11px] text-slate-500 mt-1" data-home="valueHint">Potential adjustment items requiring validation.</p></div><div id="home-value-desk" class="divide-y divide-slate-100"></div></div>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"><div class="p-4 bg-slate-50 border-b"><h3 class="font-bold text-slate-800" data-home="matrixDesk">Document Completeness Matrix</h3><p class="text-[11px] text-slate-500 mt-1" data-home="matrixHint">Evidence gaps by customs declaration.</p></div><div id="home-matrix-desk" class="divide-y divide-slate-100"></div></div>
+      </div>
+    </section>
+
+    <!-- ================= MODULE 1: RECONCILIATION ENGINE ================= -->
+    <section id="module1" class="tab-content space-y-6">
+      
+      <!-- Section Header -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h2 class="text-xl font-bold text-slate-900">Module 1: Động Cơ Đối Chiếu Dữ Liệu Đa Nguồn & Ánh Xạ 1-to-N</h2>
+            <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">1:N & N:1 Mapping</span>
+          </div>
+          <p class="text-sm text-slate-500 mt-1">
+            Tự động gộp tồn kho nhiều mã ERP ánh xạ vào 1 mã Hải quan, phân tách dung sai hao hụt và cảnh báo mã chưa liên kết.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Scrap Tolerance Setting -->
+          <div class="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-300 text-xs">
+            <label for="scrap-tolerance-input" class="font-bold text-slate-700 whitespace-nowrap">Dung sai phế liệu (%):</label>
+            <input type="number" id="scrap-tolerance-input" value="3.0" step="0.5" min="0" max="20" onchange="updateScrapTolerance(this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <span class="text-slate-400 font-semibold">%</span>
+          </div>
+
+          <button onclick="downloadSampleExcelTemplates()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Tải 3 File Excel Mẫu</span>
+          </button>
+          
+          <button onclick="executeReconciliation()" id="btn-reconcile" class="inline-flex items-center space-x-2 px-4 py-2 text-sm font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <i data-lucide="play" class="w-4 h-4"></i>
+            <span>Thực Hiện Đối Chiếu</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Upload Cards (3 Files) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        
+        <!-- File 1: ERP Inventory TK 152 -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between relative group hover:border-blue-400 transition" id="drop-zone-1">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">1</span>
+                <h3 class="font-bold text-slate-800 text-sm">Sổ Kho Kế Toán ERP (TK 152)</h3>
+              </div>
+              <span id="status-tag-1" class="text-xs font-medium text-slate-400">Chưa nạp</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-3">Cột: Mã NVL, Tên NVL, ĐVT, Tồn đầu kỳ, Nhập, Xuất sản xuất, Tồn cuối kỳ.</p>
+            
+            <div class="border-2 border-dashed border-slate-200 group-hover:border-blue-400 rounded-lg p-4 text-center cursor-pointer transition bg-slate-50 hover:bg-blue-50/50" onclick="document.getElementById('file-erp').click()">
+              <input type="file" id="file-erp" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileSelect(event, 1)">
+              <i data-lucide="file-spreadsheet" class="w-8 h-8 mx-auto text-slate-400 group-hover:text-blue-500 mb-2 transition"></i>
+              <p class="text-xs font-semibold text-slate-700" id="filename-1">Kéo thả hoặc Chọn file Excel ERP</p>
+              <p class="text-[10px] text-slate-400 mt-1">Hỗ trợ .xlsx, .xls (tối đa 20.000 dòng)</p>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+            <span id="rows-count-1">0 bản ghi</span>
+            <button onclick="clearFile(1)" class="text-slate-400 hover:text-red-500 text-xs">Xóa</button>
+          </div>
+        </div>
+
+        <!-- File 2: VNACCS Customs Declarations -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between relative group hover:border-blue-400 transition" id="drop-zone-2">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">2</span>
+                <h3 class="font-bold text-slate-800 text-sm">Tờ Khai Hải Quan VNACCS</h3>
+              </div>
+              <span id="status-tag-2" class="text-xs font-medium text-slate-400">Chưa nạp</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-3">Cột: Mã NVL HQ, Tên NVL, ĐVT, Lượng Nhập (E21/E31), Lượng Xuất (E52/E62), Tồn HQ.</p>
+            
+            <div class="border-2 border-dashed border-slate-200 group-hover:border-blue-400 rounded-lg p-4 text-center cursor-pointer transition bg-slate-50 hover:bg-blue-50/50" onclick="document.getElementById('file-vnaccs').click()">
+              <input type="file" id="file-vnaccs" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileSelect(event, 2)">
+              <i data-lucide="file-spreadsheet" class="w-8 h-8 mx-auto text-slate-400 group-hover:text-blue-500 mb-2 transition"></i>
+              <p class="text-xs font-semibold text-slate-700" id="filename-2">Kéo thả hoặc Chọn file VNACCS</p>
+              <p class="text-[10px] text-slate-400 mt-1">Dữ liệu tờ khai loại hình E21, E31, E52, E62</p>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+            <span id="rows-count-2">0 bản ghi</span>
+            <button onclick="clearFile(2)" class="text-slate-400 hover:text-red-500 text-xs">Xóa</button>
+          </div>
+        </div>
+
+        <!-- File 3: BOM & Part-Number Mapping -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between relative group hover:border-blue-400 transition" id="drop-zone-3">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">3</span>
+                <h3 class="font-bold text-slate-800 text-sm">Bảng Ánh Xạ Mã & Định Mức (BOM)</h3>
+              </div>
+              <span id="status-tag-3" class="text-xs font-medium text-slate-400">Chưa nạp</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-3">Cột: Mã NVL Nội Bộ, Mã NVL Hải Quan, Định Mức ĐK, Tiêu Hao Thực Tế, Tỷ Lệ Quy Đổi.</p>
+            
+            <div class="border-2 border-dashed border-slate-200 group-hover:border-blue-400 rounded-lg p-4 text-center cursor-pointer transition bg-slate-50 hover:bg-blue-50/50" onclick="document.getElementById('file-bom').click()">
+              <input type="file" id="file-bom" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileSelect(event, 3)">
+              <i data-lucide="file-spreadsheet" class="w-8 h-8 mx-auto text-slate-400 group-hover:text-blue-500 mb-2 transition"></i>
+              <p class="text-xs font-semibold text-slate-700" id="filename-3">Kéo thả hoặc Chọn file Định Mức BOM</p>
+              <p class="text-[10px] text-slate-400 mt-1">Hỗ trợ 1 Mã Hải Quan liên kết N Mã Nội Bộ</p>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+            <span id="rows-count-3">0 bản ghi</span>
+            <button onclick="clearFile(3)" class="text-slate-400 hover:text-red-500 text-xs">Xóa</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Processing Progress Bar -->
+      <div id="progress-container" class="hidden bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+          <span id="progress-status-text">Đang phân tích dữ liệu 1-to-N theo khối không chặn UI...</span>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+          <div id="progress-bar" class="bg-blue-600 h-full rounded-full transition-all duration-150" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Reconciliation Metric Cards -->
+      <div id="reconciliation-summary" class="hidden grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500 uppercase">Tổng cụm đối soát</p>
+          <p class="text-2xl font-extrabold text-slate-800 mt-1" id="metric-total-items">0</p>
+          <span class="text-[11px] text-slate-400">Nhóm theo Mã Hải Quan</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 shadow-sm">
+          <p class="text-xs font-semibold text-emerald-700 uppercase">Khớp hoàn toàn</p>
+          <p class="text-2xl font-extrabold text-emerald-600 mt-1" id="metric-matched-items">0</p>
+          <span class="text-[11px] text-emerald-600 font-medium">Σ Tồn ERP = Tồn HQ</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-rose-200 bg-rose-50/30 shadow-sm">
+          <p class="text-xs font-semibold text-rose-700 uppercase">Chênh lệch Tồn (Δ)</p>
+          <p class="text-2xl font-extrabold text-rose-600 mt-1" id="metric-discrepancy-items">0</p>
+          <span class="text-[11px] text-rose-600 font-medium">Lệch số dư kho</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-rose-200 bg-rose-50/30 shadow-sm">
+          <p class="text-xs font-semibold text-rose-700 uppercase">BOM Vượt Dung Sai</p>
+          <p class="text-2xl font-extrabold text-rose-600 mt-1" id="metric-bom-violations">0</p>
+          <span class="text-[11px] text-rose-600 font-medium" id="metric-bom-tolerance-sub">Vượt > 3.0% (Báo động đỏ)</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-purple-200 bg-purple-50/30 shadow-sm">
+          <p class="text-xs font-semibold text-purple-700 uppercase">Mã chưa ánh xạ</p>
+          <p class="text-2xl font-extrabold text-purple-600 mt-1" id="metric-unmapped-items">0</p>
+          <span class="text-[11px] text-purple-600 font-medium">Cần ánh xạ thủ công</span>
+        </div>
+      </div>
+
+      <!-- Reconciliation Results Table Container -->
+      <div id="results-table-container" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <!-- Table Toolbar & Filters -->
+        <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Lọc hiển thị:</span>
+            <div class="inline-flex rounded-lg border border-slate-300 p-0.5 bg-white text-xs">
+              <button onclick="filterResults('all')" id="filter-all" class="px-3 py-1 font-semibold rounded-md bg-blue-600 text-white">Tất cả</button>
+              <button onclick="filterResults('discrepancy')" id="filter-discrepancy" class="px-3 py-1 font-semibold rounded-md text-slate-600 hover:text-slate-900">Có chênh lệch (Δ ≠ 0)</button>
+              <button onclick="filterResults('bom-red')" id="filter-bom-red" class="px-3 py-1 font-semibold rounded-md text-slate-600 hover:text-slate-900">Vượt Dung Sai (Báo động đỏ)</button>
+              <button onclick="filterResults('bom-tolerated')" id="filter-bom-tolerated" class="px-3 py-1 font-semibold rounded-md text-slate-600 hover:text-slate-900">Trong dung sai (Vàng)</button>
+              <button onclick="filterResults('unmapped')" id="filter-unmapped" class="px-3 py-1 font-semibold rounded-md text-slate-600 hover:text-slate-900">
+                <span>Chưa khớp mã</span>
+                <span id="unmapped-count-badge" class="ml-1 px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="table-search-input" onkeyup="searchTable()" placeholder="Tìm Mã HQ, Mã ERP, Tên..." class="pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none w-52">
+            </div>
+            <button onclick="openManualMappingModal()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow transition">
+              <i data-lucide="link" class="w-4 h-4"></i>
+              <span>+ Ánh Xạ Thủ Công</span>
+            </button>
+            <button onclick="exportReconciliationReport()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow transition">
+              <i data-lucide="file-down" class="w-4 h-4"></i>
+              <span>Xuất Báo Cáo Excel</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Table View -->
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-3">Mã Hải Quan</th>
+                <th class="py-3 px-3">Mã ERP Nội Bộ (1:N)</th>
+                <th class="py-3 px-3">Tên Nguyên Vật Liệu</th>
+                <th class="py-3 px-2 text-center">ĐVT</th>
+                <th class="py-3 px-3 text-right">Tổng Tồn ERP (Σ)</th>
+                <th class="py-3 px-3 text-right">Tồn Hải Quan</th>
+                <th class="py-3 px-3 text-right">Chênh Lệch (Δ)</th>
+                <th class="py-3 px-3 text-right">BOM Đăng Ký</th>
+                <th class="py-3 px-3 text-right">BOM Thực Tế</th>
+                <th class="py-3 px-3 text-center">Trạng Thái Rủi Ro</th>
+                <th class="py-3 px-3 text-center">Hành Động</th>
+              </tr>
+            </thead>
+            <tbody id="reconciliation-tbody" class="divide-y divide-slate-200">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table Footer -->
+        <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span id="table-rows-showing">Hiển thị 0 dòng</span>
+          <span class="text-[11px] text-slate-400 italic">Quy tắc: Δ = Tổng Tồn ERP (các mã gộp) - Tồn Hải Quan VNACCS</span>
+        </div>
+      </div>
+
+      <!-- CR-02: Line-level traceability & inventory purpose segregation -->
+      <div id="cr02-showcase" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2"><i data-lucide="scan-line" class="w-5 h-5 text-amber-300"></i><h3 class="font-bold" data-cr="traceTitle">CR-02 · Truy vết chi tiết & phân luồng hàng tồn</h3><span class="text-[10px] bg-amber-400/20 text-amber-200 border border-amber-300/30 rounded px-2 py-0.5 font-bold">MVP SHOWCASE</span></div>
+            <p class="text-xs text-slate-300 mt-1" data-cr="traceSubtitle">Đối chiếu theo Tờ khai + Nhà cung cấp/MST + Mã hàng, thay vì chỉ gộp theo mã.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="loadCr02Demo()" class="inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 px-3 py-2 rounded-lg text-xs font-bold"><i data-lucide="sparkles" class="w-4 h-4"></i><span data-cr="loadDemo">Nạp tình huống demo</span></button>
+            <button onclick="exportCr02Report()" class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-2 rounded-lg text-xs font-bold"><i data-lucide="file-down" class="w-4 h-4"></i><span data-cr="export">Xuất báo cáo</span></button>
+          </div>
+        </div>
+        <div class="p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 text-xs font-bold">
+            <button onclick="setCr02View('production')" id="cr02-btn-production" class="px-3 py-1.5 rounded-md bg-blue-600 text-white" data-cr="viewProduction">A · Sản xuất (152/BOM)</button>
+            <button onclick="setCr02View('commercial')" id="cr02-btn-commercial" class="px-3 py-1.5 rounded-md text-slate-600" data-cr="viewCommercial">B · Thương mại (156)</button>
+            <button onclick="setCr02View('asset')" id="cr02-btn-asset" class="px-3 py-1.5 rounded-md text-slate-600" data-cr="viewAsset">C · Tài sản (153/211)</button>
+          </div>
+          <p class="text-[11px] text-slate-500" data-cr="uploadHint">Mẫu import: ERP Goods Receipt + VNACCS Declaration + Issue / Disposal Log</p>
+        </div>
+        <div class="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3" id="cr02-kpis"></div>
+        <div id="cr02-risk-banner" class="mx-4 mb-4 hidden rounded-lg border p-3 text-xs"></div>
+        <div class="mx-4 mb-4 overflow-x-auto border border-slate-200 rounded-lg">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-100 text-slate-700 font-bold"><tr>
+              <th class="p-3" data-cr="declNo">Tờ khai HQ</th><th class="p-3" data-cr="supplier">Nhà cung cấp / MST</th><th class="p-3" data-cr="partNo">Mã hàng</th><th class="p-3" data-cr="account">TK</th><th class="p-3" data-cr="purpose">Mục đích NK</th><th class="p-3 text-right" data-cr="importQty">SL nhập</th><th class="p-3 text-right" data-cr="issueQty">SL xuất/dùng</th><th class="p-3" data-cr="evidence">Chứng từ luồng</th><th class="p-3" data-cr="riskStatus">Trạng thái rủi ro</th>
+            </tr></thead>
+            <tbody id="cr02-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div class="px-5 pb-5 text-[11px] text-slate-500" id="cr02-footnote"></div>
+      </div>
+
+    </section>
+
+    <!-- ================= MODULE 2: BCQT & PCA DASHBOARD ================= -->
+    <section id="module2" class="tab-content hidden space-y-6">
+      
+      <!-- Top Grid: Countdown & Pre-settlement Alerts -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Statutory Countdown Timer Card -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-xs font-bold tracking-wider text-amber-400 uppercase bg-amber-400/10 px-2.5 py-1 rounded border border-amber-400/30">
+                Thông tư 39/2018/TT-BTC
+              </span>
+              <i data-lucide="timer" class="w-5 h-5 text-amber-400"></i>
+            </div>
+            
+            <h3 class="text-lg font-extrabold text-white">Thời Hạn Nộp BCQT (Mẫu 15)</h3>
+            <p class="text-xs text-slate-400 mt-1">Hạn nộp chậm nhất là ngày thứ 90 kể từ ngày kết thúc năm tài chính.</p>
+            
+            <!-- Fiscal Year Selection -->
+            <div class="mt-4 bg-slate-800/80 p-3 rounded-lg border border-slate-700 flex items-center justify-between text-xs">
+              <label class="text-slate-300 font-medium">Ngày kết thúc niên độ:</label>
+              <input type="date" id="bcqt-fiscal-date" value="2025-12-31" onchange="calculateBcqtDeadline()" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-amber-300 font-mono focus:outline-none focus:border-amber-400">
+            </div>
+
+            <!-- Countdown Clock Display -->
+            <div class="grid grid-cols-4 gap-2 mt-5 text-center">
+              <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                <span id="cd-days" class="text-2xl sm:text-3xl font-mono font-black text-amber-400">00</span>
+                <p class="text-[10px] text-slate-400 uppercase font-semibold">Ngày</p>
+              </div>
+              <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                <span id="cd-hours" class="text-2xl sm:text-3xl font-mono font-black text-white">00</span>
+                <p class="text-[10px] text-slate-400 uppercase font-semibold">Giờ</p>
+              </div>
+              <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                <span id="cd-minutes" class="text-2xl sm:text-3xl font-mono font-black text-white">00</span>
+                <p class="text-[10px] text-slate-400 uppercase font-semibold">Phút</p>
+              </div>
+              <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-2.5">
+                <span id="cd-seconds" class="text-2xl sm:text-3xl font-mono font-black text-slate-300">00</span>
+                <p class="text-[10px] text-slate-400 uppercase font-semibold">Giây</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Hạn chót luật định:</span>
+            <span id="bcqt-deadline-text" class="font-bold font-mono text-amber-300 text-sm">31/03/2026</span>
+          </div>
+        </div>
+
+        <!-- High-Risk Pre-Settlement Items (Checkpoint) -->
+        <div class="lg:col-span-2 bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-bold text-slate-800 text-base flex items-center space-x-2">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>
+                <span>4 Hạng Mục Rủi Ro Cao Cần Xử Lý Trước Nộp BCQT</span>
+              </h3>
+              <span class="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded">Pre-Settlement Check</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Các yếu tố hải quan thường thanh tra và truy thu thuế khi đối chiếu Báo cáo quyết toán với Báo cáo tài chính đã kiểm toán.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <!-- Item 1: Surplus Materials -->
+              <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start space-x-3">
+                <input type="checkbox" id="risk-chk-1" checked onchange="updatePcaScore()" class="mt-1 w-4 h-4 text-blue-600 rounded">
+                <div>
+                  <label for="risk-chk-1" class="font-bold text-xs text-slate-800 cursor-pointer">1. Nguyên liệu dư thừa tồn đọng</label>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Dư thừa sau khi hoàn thành đơn hàng gia công/SXXK chưa đăng ký chuyển mục đích sử dụng hoặc tái xuất.</p>
+                </div>
+              </div>
+
+              <!-- Item 2: Scrap & Waste -->
+              <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start space-x-3">
+                <input type="checkbox" id="risk-chk-2" checked onchange="updatePcaScore()" class="mt-1 w-4 h-4 text-blue-600 rounded">
+                <div>
+                  <label for="risk-chk-2" class="font-bold text-xs text-slate-800 cursor-pointer">2. Phế liệu, phế phẩm thu hồi</label>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Bán tiêu thụ nội địa chưa kê khai tờ khai chuyển tiêu thụ nội địa (A42) và chưa nộp thuế GTGT/nhập khẩu.</p>
+                </div>
+              </div>
+
+              <!-- Item 3: Temporary machinery -->
+              <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start space-x-3">
+                <input type="checkbox" id="risk-chk-3" checked onchange="updatePcaScore()" class="mt-1 w-4 h-4 text-blue-600 rounded">
+                <div>
+                  <label for="risk-chk-3" class="font-bold text-xs text-slate-800 cursor-pointer">3. Máy móc tạm nhập - tái xuất</label>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Thiết bị mượn từ đối tác nước ngoài (G12) đã quá thời hạn lưu giữ tại VN nhưng chưa gia hạn hoặc chuyển loại hình.</p>
+                </div>
+              </div>
+
+              <!-- Item 4: BOM & Financial consistency -->
+              <div class="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start space-x-3">
+                <input type="checkbox" id="risk-chk-4" checked onchange="updatePcaScore()" class="mt-1 w-4 h-4 text-blue-600 rounded">
+                <div>
+                  <label for="risk-chk-4" class="font-bold text-xs text-slate-800 cursor-pointer">4. Lệch chi phí TK 621 với BCQT</label>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Chi phí NVL trực tiếp (TK 621) trên sổ sách kế toán chênh lệch bất thường so với lượng xuất dùng trên mẫu 15.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between text-xs text-amber-800">
+            <span class="flex items-center space-x-2">
+              <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
+              <span>Khuyến nghị: Lập biên bản kiểm kê kho và hoàn thiện hồ sơ thanh lý trước ngày chốt BCQT.</span>
+            </span>
+            <button onclick="switchTab('module4')" class="text-blue-700 font-bold hover:underline">Tạo công văn giải trình &rarr;</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 5-Year PCA Lookback Audit Risk Checklist (Art 78 Customs Law 2014) -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-200 gap-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-lg font-bold text-slate-900">Kiểm Tra Sau Thông Quan (PCA) - Checklist 5 Năm Theo Điều 78 Luật Hải Quan 2014</h3>
+              <span class="text-xs bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded">Lookback 5 Years</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Đánh giá nguy cơ bị truy thu và xử phạt khi cơ quan Hải quan tiến hành kiểm tra sau thông quan tại trụ sở doanh nghiệp.</p>
+          </div>
+
+          <!-- Overall Audit Risk Score Widget -->
+          <div class="flex items-center space-x-4 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-500">Chỉ số rủi ro PCA</p>
+              <div class="flex items-center space-x-2">
+                <span id="pca-score-num" class="text-2xl font-black text-rose-600">65/100</span>
+                <span id="pca-score-badge" class="text-xs font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800">RỦI RO CAO</span>
+              </div>
+            </div>
+            <div class="w-24">
+              <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+                <div id="pca-score-bar" class="bg-rose-500 h-full rounded-full transition-all" style="width: 65%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6 Audit Pillars Checklist -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          
+          <!-- Pillar 1: Mã HS -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">1</span>
+              <h4 class="font-bold text-xs text-slate-800">Phân loại & Áp mã HS</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Kiểm tra tính nhất quán mã HS giữa tờ khai nhập khẩu và xuất khẩu trong 5 năm.</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="15" onchange="updatePcaScore()">
+                <span>Có mã HS tranh chấp thuế suất ưu đãi</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="10" onchange="updatePcaScore()">
+                <span>Thay đổi mã HS không có văn bản tham vấn</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pillar 2: Trị giá Hải quan -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">2</span>
+              <h4 class="font-bold text-xs text-slate-800">Trị giá Hải quan & Phí bản quyền</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Rà soát các khoản điều chỉnh cộng vào trị giá tính thuế nhập khẩu.</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="20" checked onchange="updatePcaScore()">
+                <span>Chưa cộng phí bản quyền, giấy phép vào tờ khai</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="15" checked onchange="updatePcaScore()">
+                <span>Khoản trợ giúp kỹ thuật, khuôn mẫu miễn phí từ đối tác</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pillar 3: C/O & Quy tắc xuất xứ -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">3</span>
+              <h4 class="font-bold text-xs text-slate-800">Quy tắc xuất xứ (C/O)</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Rủi ro bị bác C/O form ưu đãi (Form E, D, AK, VJ, EUR.1...).</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="15" onchange="updatePcaScore()">
+                <span>Hóa đơn bên thứ ba (Third party invoice) thiếu chứng từ vận tải</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="10" onchange="updatePcaScore()">
+                <span>C/O cấp sau (Issued Retroactively) sai tiêu chí</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pillar 4: Định mức thực tế (BOM) -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">4</span>
+              <h4 class="font-bold text-xs text-slate-800">Định mức & Tỷ lệ hao hụt</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Định mức thông báo hải quan không khớp hồ sơ kỹ thuật sản xuất thực tế.</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="25" checked onchange="updatePcaScore()">
+                <span>Tỷ lệ hao hụt thực tế lớn hơn đăng ký với hải quan</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="15" onchange="updatePcaScore()">
+                <span>Không lưu bảng phân bổ NVL từng lệnh sản xuất</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pillar 5: Tiêu hủy & Chuyển đổi mục đích -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">5</span>
+              <h4 class="font-bold text-xs text-slate-800">Thanh lý & Chuyển mục đích</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Thủ tục tiêu hủy phế liệu, máy móc miễn thuế.</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="15" onchange="updatePcaScore()">
+                <span>Tiêu hủy phế liệu không thông báo cơ quan Hải quan</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="10" onchange="updatePcaScore()">
+                <span>Bán thanh lý tài sản miễn thuế chưa kê khai nộp thuế</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Pillar 6: Lưu trữ chứng từ kế toán 5 năm -->
+          <div class="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">6</span>
+              <h4 class="font-bold text-xs text-slate-800">Lưu trữ hồ sơ 5 năm (Điều 78)</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-3">Nghĩa vụ xuất trình chứng từ gốc khi đoàn thanh tra kiểm tra.</p>
+            <div class="space-y-1.5 text-xs">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="10" onchange="updatePcaScore()">
+                <span>Thiếu chứng từ thanh toán ngân hàng (Ủy nhiệm chi)</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" class="pca-check" data-weight="10" onchange="updatePcaScore()">
+                <span>Hồ sơ xuất nhập khẩu các năm trước bị thất lạc</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= MODULE 3: FINANCIAL EXPOSURE CALCULATOR WITH PARTIAL PAYMENT ================= -->
+    <section id="module3" class="tab-content hidden space-y-6">
+      
+      <!-- Section Header -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+        <div class="flex items-center space-x-2">
+          <h2 class="text-xl font-bold text-slate-900">Module 3: Công Cụ Đo Lường Rủi Ro Tài Chính & Tiền Chậm Nộp</h2>
+          <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">Hỗ trợ Tạm Ứng Giữa Kỳ</span>
+        </div>
+        <p class="text-sm text-slate-500 mt-1">
+          Mô phỏng chính xác số tiền chậm nộp <strong>0,03%/ngày</strong> (khoản 2 Điều 59 Luật 38/2019/QH14). Tự động dừng tính lãi trên phần tiền nộp tạm ứng kể từ ngày nộp.
+        </p>
+      </div>
+
+      <!-- Main Calculator & Simulation Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Calculator Inputs (Left 5 cols) -->
+        <div class="lg:col-span-5 bg-white rounded-xl p-6 shadow-sm border border-slate-200 space-y-5">
+          <h3 class="font-bold text-slate-800 text-base border-b border-slate-200 pb-3 flex items-center space-x-2">
+            <i data-lucide="sliders" class="w-5 h-5 text-blue-600"></i>
+            <span>Tham Số Nghĩa Vụ Thuế & Lịch Trình Nộp</span>
+          </h3>
+
+          <!-- Back-tax input -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tổng tiền thuế truy thu ban đầu (VNĐ):</label>
+            <div class="relative">
+              <input type="number" id="calc-back-tax" value="250000000" step="1000000" oninput="calculateExposure()" class="w-full pl-3 pr-12 py-2 border border-slate-300 rounded-lg text-sm font-mono font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">VNĐ</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1" id="formatted-back-tax">250.000.000 VNĐ</p>
+          </div>
+
+          <!-- Date Inputs -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Ngày phát sinh nghĩa vụ:</label>
+              <input type="date" id="calc-start-date" value="2024-01-15" onchange="calculateExposure()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <span class="text-[10px] text-slate-400">Ngày thông quan / tờ khai</span>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Ngày quyết toán / nộp dứt điểm:</label>
+              <input type="date" id="calc-end-date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" onchange="calculateExposure()">
+              <span class="text-[10px] text-slate-400">Ngày thanh toán dứt điểm</span>
+            </div>
+          </div>
+
+          <!-- Intermediate Partial Payment Section -->
+          <div class="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center space-x-2 text-xs font-bold text-blue-900 cursor-pointer">
+                <input type="checkbox" id="calc-has-partial" onchange="togglePartialPayment()" class="w-4 h-4 text-blue-600 rounded">
+                <span>Doanh nghiệp có nộp tạm ứng giữa kỳ</span>
+              </label>
+              <span class="text-[10px] bg-blue-200 text-blue-800 font-bold px-2 py-0.5 rounded">Giảm Lãi</span>
+            </div>
+
+            <div id="partial-payment-inputs" class="space-y-3 hidden pt-2 border-t border-blue-200/60">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Số tiền đã nộp tạm ứng (VNĐ):</label>
+                <input type="number" id="calc-partial-amount" value="100000000" step="1000000" oninput="calculateExposure()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-emerald-700 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <p class="text-[10px] text-slate-500 mt-0.5" id="formatted-partial-amount">100.000.000 VNĐ</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ngày nộp tạm ứng vào NSNN:</label>
+                <input type="date" id="calc-partial-date" value="2024-06-15" onchange="calculateExposure()" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="text-[10px] text-slate-400">Dừng tính tiền chậm nộp trên số tiền này kể từ ngày nộp</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Penalty selection -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-2">Tùy chọn xử phạt VPHC (Nghị định 128/2020/NĐ-CP):</label>
+            <div class="space-y-2">
+              <label class="flex items-center space-x-2 text-xs text-slate-700 p-2.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100">
+                <input type="radio" name="penalty-rate" value="0.20" checked onchange="calculateExposure()" class="w-4 h-4 text-blue-600">
+                <div>
+                  <span class="font-bold">Phạt 20% tiền thuế thiếu</span>
+                  <span class="text-slate-500 block text-[11px]">Áp dụng khi cơ quan Hải quan phát hiện trong thanh tra/PCA</span>
+                </div>
+              </label>
+
+              <label class="flex items-center space-x-2 text-xs text-slate-700 p-2.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100">
+                <input type="radio" name="penalty-rate" value="0" onchange="calculateExposure()" class="w-4 h-4 text-blue-600">
+                <div>
+                  <span class="font-bold">Miễn phạt 20% (Chỉ nộp thuế + Chậm nộp)</span>
+                  <span class="text-slate-500 block text-[11px]">Tự nguyện khai bổ sung trước khi công bố Quyết định kiểm tra</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="pt-2">
+            <span class="text-[11px] font-bold text-slate-500 uppercase">Preset mốc thời gian PCA:</span>
+            <div class="flex flex-wrap gap-1.5 mt-1.5">
+              <button onclick="setPresetDays(90)" class="px-2.5 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium">90 ngày</button>
+              <button onclick="setPresetDays(365)" class="px-2.5 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium">1 năm</button>
+              <button onclick="setPresetDays(730)" class="px-2.5 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium">2 năm</button>
+              <button onclick="setPresetDays(1825)" class="px-2.5 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium">5 năm (Max PCA)</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Calculator Results & Stage Breakdown (Right 7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+          
+          <!-- Summary Cards -->
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <h3 class="font-bold text-slate-800 text-base">Tổng Nghĩa Vụ Tài Chính Phải Nộp Còn Lại</h3>
+              <span id="badge-days-count" class="text-xs bg-blue-100 text-blue-800 font-bold font-mono px-2.5 py-1 rounded-full">Trễ 0 ngày</span>
+            </div>
+
+            <!-- Big Number -->
+            <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 rounded-xl text-center shadow-inner">
+              <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Số tiền thực tế còn phải nộp dứt điểm</span>
+              <p id="total-exposure-amount" class="text-3xl sm:text-4xl font-black font-mono text-amber-400 mt-1">0 VNĐ</p>
+              <p class="text-xs text-slate-300 mt-2" id="exposure-sub-desc">Đã khấu trừ số tiền nộp tạm ứng</p>
+            </div>
+
+            <!-- Breakdown Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-center">
+              <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <span class="text-[10px] text-slate-500 font-semibold block uppercase">1. Thuế Gốc Còn Lại</span>
+                <span id="breakdown-tax" class="text-xs sm:text-sm font-bold font-mono text-slate-800 mt-1 block">0 VNĐ</span>
+              </div>
+              <div class="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-lg">
+                <span class="text-[10px] text-emerald-700 font-semibold block uppercase">2. Đã Tạm Ứng</span>
+                <span id="breakdown-paid" class="text-xs sm:text-sm font-bold font-mono text-emerald-600 mt-1 block">0 VNĐ</span>
+              </div>
+              <div class="p-2.5 bg-amber-50/60 border border-amber-200 rounded-lg">
+                <span class="text-[10px] text-amber-700 font-semibold block uppercase">3. Phạt VPHC (20%)</span>
+                <span id="breakdown-penalty" class="text-xs sm:text-sm font-bold font-mono text-amber-600 mt-1 block">0 VNĐ</span>
+              </div>
+              <div class="p-2.5 bg-rose-50/60 border border-rose-200 rounded-lg">
+                <span class="text-[10px] text-rose-700 font-semibold block uppercase">4. Chậm Nộp 0.03%</span>
+                <span id="breakdown-interest" class="text-xs sm:text-sm font-bold font-mono text-rose-600 mt-1 block">0 VNĐ</span>
+              </div>
+            </div>
+
+            <!-- Multi-Stage Interest Schedule Table -->
+            <div id="multi-stage-container" class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-bold text-slate-700 flex items-center space-x-1.5">
+                  <i data-lucide="layers" class="w-4 h-4 text-blue-600"></i>
+                  <span>Lịch Trình Tính Lãi Từng Giai Đoạn (Chi Tiết):</span>
+                </span>
+                <span id="savings-badge" class="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Tiết kiệm 0 VNĐ</span>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-[11px]">
+                  <thead>
+                    <tr class="border-b border-slate-200 text-slate-500">
+                      <th class="py-1">Giai đoạn</th>
+                      <th class="py-1">Khoảng thời gian</th>
+                      <th class="py-1 text-center">Số ngày</th>
+                      <th class="py-1 text-right">Gốc tính lãi</th>
+                      <th class="py-1 text-right">Mức lãi (0.03%/ngày)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="interest-schedule-tbody" class="font-mono divide-y divide-slate-200/60">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Scenario Comparison Simulation -->
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+            <h4 class="font-bold text-xs uppercase text-slate-500 tracking-wider mb-3">Hiệu Quả Tài Chính: Nộp Tạm Ứng vs Để Quá Hạn Đến Khi Bị Kiểm Tra</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div class="p-4 rounded-xl border border-emerald-300 bg-emerald-50/40">
+                <div class="flex items-center space-x-1.5 text-emerald-800 font-bold text-xs mb-1">
+                  <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Kịch bản hiện tại (Có tạm ứng / tự nguyện)</span>
+                </div>
+                <p class="text-[11px] text-slate-600">Dừng lãi sớm trên phần tiền đã nộp vào Kho bạc.</p>
+                <p id="scenario-a-amount" class="text-lg font-black font-mono text-emerald-700 mt-3">0 VNĐ</p>
+                <span id="scenario-a-savings" class="text-[10px] text-emerald-600 font-bold">Tiết kiệm chi phí lãi & phạt</span>
+              </div>
+
+              <div class="p-4 rounded-xl border border-rose-300 bg-rose-50/40">
+                <div class="flex items-center space-x-1.5 text-rose-800 font-bold text-xs mb-1">
+                  <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-600"></i>
+                  <span>Kịch bản xấu nhất (Không tạm ứng + Phạt 20%)</span>
+                </div>
+                <p class="text-[11px] text-slate-600">Bị tính lãi toàn bộ số tiền trên 100% số ngày trễ hạn.</p>
+                <p id="scenario-b-amount" class="text-lg font-black font-mono text-rose-700 mt-3">0 VNĐ</p>
+                <span id="scenario-diff-text" class="text-[10px] text-rose-600 font-bold">Chênh lệch rủi ro: +0 VNĐ</span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ================= MODULE 4: STATUTORY SLA & DOCX GENERATOR ================= -->
+    <section id="module4" class="tab-content hidden space-y-6">
+      
+      <!-- Section Header -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+        <div class="flex items-center space-x-2">
+          <h2 class="text-xl font-bold text-slate-900">Module 4: Bộ Đếm Thời Hiệu Khiếu Nại (SLA) & Tạo Văn Bản Pháp Lý Tự Động</h2>
+          <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">Law on Complaints & DOCX</span>
+        </div>
+        <p class="text-sm text-slate-500 mt-1">
+          Theo dõi sát sao thời hiệu khiếu nại quyết định ấn định thuế/xử phạt và tự động tạo file Word (.docx) đơn khiếu nại, công văn giải trình.
+        </p>
+      </div>
+
+      <!-- Statutory SLA Tracker Cards -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-3">
+          <div class="flex items-center space-x-3">
+            <label class="text-xs font-bold text-slate-700">Ngày nhận Quyết định Hải quan:</label>
+            <input type="date" id="sla-decision-date" onchange="calculateSlaDeadlines()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <span class="text-xs text-slate-500 italic">Tính chính xác theo lịch dương (UTC)</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6">
+          
+          <!-- SLA 1: First-level Appeal (90 days) -->
+          <div class="p-5 rounded-xl border-2 border-blue-200 bg-blue-50/20 relative flex flex-col justify-between" id="sla-card-1">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded">Bước 1</span>
+                <span id="sla-badge-1" class="text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">CÒN HẠN</span>
+              </div>
+              <h4 class="text-base font-bold text-slate-900">Khiếu Nại Lần Đầu</h4>
+              <p class="text-xs text-slate-500 mt-1">Điều 9 Luật Khiếu nại số 02/2011/QH13.</p>
+
+              <div class="my-4">
+                <div class="flex items-baseline space-x-1">
+                  <span id="sla-days-left-1" class="text-3xl font-black font-mono text-blue-700">90</span>
+                  <span class="text-xs font-bold text-slate-500">ngày còn lại</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-2">
+                  <div id="sla-bar-1" class="bg-blue-600 h-full rounded-full transition-all" style="width: 100%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 text-xs flex items-center justify-between">
+              <span class="text-slate-500">Hạn chót:</span>
+              <span id="sla-deadline-1" class="font-bold font-mono text-slate-800">--/--/----</span>
+            </div>
+          </div>
+
+          <!-- SLA 2: Second-level Appeal (30 days) -->
+          <div class="p-5 rounded-xl border-2 border-slate-200 bg-slate-50/50 relative flex flex-col justify-between" id="sla-card-2">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-700 bg-slate-200 px-2 py-0.5 rounded">Bước 2</span>
+                <span id="sla-badge-2" class="text-xs font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">CHƯA KÍCH HOẠT</span>
+              </div>
+              <h4 class="text-base font-bold text-slate-900">Khiếu Nại Lần Hai</h4>
+              <p class="text-xs text-slate-500 mt-1">Điều 33 Luật Khiếu nại (Gửi Cục trưởng/Tổng cục trưởng).</p>
+
+              <div class="my-4">
+                <div class="flex items-baseline space-x-1">
+                  <span id="sla-days-left-2" class="text-3xl font-black font-mono text-slate-700">30</span>
+                  <span class="text-xs font-bold text-slate-500">ngày</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">Kể từ ngày hết thời hạn giải quyết khiếu nại lần đầu mà không được giải quyết.</p>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 text-xs flex items-center justify-between">
+              <span class="text-slate-500">Thời hiệu:</span>
+              <span class="font-bold font-mono text-slate-800">30 ngày tiếp theo</span>
+            </div>
+          </div>
+
+          <!-- SLA 3: Administrative Lawsuit (365 days) -->
+          <div class="p-5 rounded-xl border-2 border-purple-200 bg-purple-50/20 relative flex flex-col justify-between" id="sla-card-3">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded">Tòa Án</span>
+                <span id="sla-badge-3" class="text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">CÒN HẠN</span>
+              </div>
+              <h4 class="text-base font-bold text-slate-900">Khởi Kiện Hành Chính</h4>
+              <p class="text-xs text-slate-500 mt-1">Điều 116 Luật Tố tụng hành chính số 93/2015/QH13.</p>
+
+              <div class="my-4">
+                <div class="flex items-baseline space-x-1">
+                  <span id="sla-days-left-3" class="text-3xl font-black font-mono text-purple-700">365</span>
+                  <span class="text-xs font-bold text-slate-500">ngày còn lại</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-2">
+                  <div id="sla-bar-3" class="bg-purple-600 h-full rounded-full transition-all" style="width: 100%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 text-xs flex items-center justify-between">
+              <span class="text-slate-500">Hạn nộp đơn tại Tòa:</span>
+              <span id="sla-deadline-3" class="font-bold font-mono text-slate-800">--/--/----</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Automated Legal Document Generator (DOCX.js) -->
+      <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+        <div class="border-b border-slate-200 pb-4 mb-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                <i data-lucide="file-signature" class="w-5 h-5 text-blue-600"></i>
+                <span>Trình Tạo Văn Bản Pháp Lý Tự Động (.DOCX)</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">Tạo lập file Word chuẩn thể thức văn bản hành chính Việt Nam (Nghị định 30/2020/NĐ-CP) ngay trên trình duyệt.</p>
+            </div>
+            <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">No Backend Needed</span>
+          </div>
+        </div>
+
+        <!-- Form fields for auto-filling legal docx -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Tên Doanh nghiệp:</label>
+            <input type="text" id="doc-company-name" value="CÔNG TY TNHH SẢN XUẤT TOÀN CẦU VIỆT NAM" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Mã số thuế (MST):</label>
+            <input type="text" id="doc-company-tax-id" value="0108998877" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Người đại diện theo pháp luật:</label>
+            <input type="text" id="doc-rep-name" value="Nguyễn Văn An - Tổng Giám Đốc" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">Địa chỉ trụ sở chính:</label>
+            <input type="text" id="doc-company-address" value="Lô CN-08, Khu công nghiệp VSIP, Phường An Phú, TP. Thuận An, Bình Dương" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Cơ quan Hải quan ban hành quyết định:</label>
+            <input type="text" id="doc-customs-authority" value="Chi cục Hải quan Quản lý Hàng Đầu tư Gia công - Cục Hải quan Tỉnh Bình Dương" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Số Quyết định bị khiếu nại/giải trình:</label>
+            <input type="text" id="doc-decision-no" value="1234/QĐ-HQBD" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Ngày ban hành Quyết định:</label>
+            <input type="date" id="doc-decision-date" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Số tiền thuế ấn định / truy thu (VNĐ):</label>
+            <input type="text" id="doc-tax-amount" value="250.000.000" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div class="md:col-span-3">
+            <label class="block font-bold text-slate-700 mb-1">Tóm tắt nội dung không đồng ý & Lý do khiếu nại / giải trình:</label>
+            <textarea id="doc-reason" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Nêu rõ căn cứ: Định mức thực tế sai khác do tính chất công nghệ hao hụt tự nhiên, mã HS áp đúng theo Chú giải chi tiết HS, v.v.">Doanh nghiệp nhận thấy việc Đoàn kiểm tra ấn định thuế đối với mã nguyên liệu IC-MCU-ARM32 và tính tiền chậm nộp là chưa phù hợp với thực tế sản xuất và hướng dẫn tại Thông tư 39/2018/TT-BTC. Tỷ lệ hao hụt thực tế phát sinh do lỗi nhiệt trong công đoạn hàn vi mạch bề mặt (SMT), đã được ghi nhận trong biên bản kỹ thuật nội bộ.</textarea>
+          </div>
+
+        </div>
+
+        <!-- Document Selection & Action Buttons -->
+        <div class="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center space-x-2 text-xs text-slate-600">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i>
+            <span>Văn bản xuất định dạng Microsoft Word (.docx) chuẩn mẫu hành chính, sẵn sàng ký duyệt.</span>
+          </div>
+
+          <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <button onclick="generateComplaintDocx()" class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shadow transition">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+              <span>Xuất Đơn Khiếu Nại Hành Chính (.DOCX)</span>
+            </button>
+
+            <button onclick="generateExplanationDocx()" class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow transition">
+              <i data-lucide="file-output" class="w-4 h-4"></i>
+              <span>Xuất Công Văn Giải Trình Số Liệu (.DOCX)</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ================= MODULE 5: AUDIT TRAIL LOG (GUARDRAIL 4) ================= -->
+    <section id="module5" class="tab-content hidden space-y-6">
+      
+      <!-- Section Header -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <h2 class="text-xl font-bold text-slate-900">Module 5: Nhật Ký Kiểm Toán Bất Biến (Audit Trail Log)</h2>
+            <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Guardrail 4: Data Immutability</span>
+          </div>
+          <p class="text-sm text-slate-500 mt-1">
+            Ghi nhận toàn bộ vết điều chỉnh (ánh xạ thủ công, thay đổi dung sai, nhập tạm ứng) với lý do giải trình. Dữ liệu gốc Excel được giữ nguyên tuyệt đối.
+          </p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="exportAuditTrailJSON()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition">
+            <i data-lucide="file-code" class="w-4 h-4 text-amber-600"></i>
+            <span>Xuất File JSON</span>
+          </button>
+          <button onclick="exportAuditTrailExcel()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow transition">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+            <span>Xuất Nhật Ký Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Audit Trail Table Container -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/60">
+          <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Danh Sách Lịch Sử Điều Chỉnh & Can Thiệp:</span>
+          <span id="audit-log-counter" class="text-xs font-mono text-slate-500">0 bản ghi</span>
+        </div>
+
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-3">Mã Log</th>
+                <th class="py-3 px-3">Thời Điểm (UTC+7)</th>
+                <th class="py-3 px-3">Người Thực Hiện</th>
+                <th class="py-3 px-3">Loại Hành Vi</th>
+                <th class="py-3 px-3">Đối Tượng</th>
+                <th class="py-3 px-3">Giá Trị Cũ</th>
+                <th class="py-3 px-3">Giá Trị Mới</th>
+                <th class="py-3 px-4">Lý Do Giải Trình (Audit Justification)</th>
+              </tr>
+            </thead>
+            <tbody id="audit-trail-tbody" class="divide-y divide-slate-200 font-mono text-[11px]">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center justify-between">
+          <span>Tất cả hành động được ký số nội bộ và ghi nhận tuần tự không thể xóa sửa.</span>
+          <span class="text-slate-400 font-mono">ISO 27001 & Customs Audit Compliance</span>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="bg-slate-900 text-slate-400 text-xs border-t border-slate-800 mt-12 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+        <span>CDMS Vietnam Customs Compliance System &bull; Standalone HTML5 Local MVP</span>
+      </div>
+      <div class="flex items-center space-x-4 text-slate-500">
+        <span>Luật Quản lý thuế số 38/2019/QH14</span>
+        <span>Thông tư 39/2018/TT-BTC</span>
+        <span>Luật Hải quan 2014</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= NOTIFICATION TOAST ================= -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-2 px-4 py-3 rounded-lg shadow-xl text-xs font-bold text-white bg-slate-900 border border-slate-700">
+    <span id="toast-icon"><i data-lucide="info" class="w-4 h-4 text-blue-400"></i></span>
+    <span id="toast-msg">Thông báo</span>
+  </div>
+
+  <!-- ================= DETAIL MODAL ================= -->
+  <div id="detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2" id="modal-title">
+          <i data-lucide="layers" class="w-5 h-5 text-blue-600"></i>
+          <span>Chi Tiết</span>
+        </h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="modal-content" class="text-xs space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-slate-200">
+        <button onclick="closeModal()" class="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MANUAL MAPPING MODAL ================= -->
+  <div id="mapping-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+          <i data-lucide="link" class="w-5 h-5 text-purple-600"></i>
+          <span>Thêm Ánh Xạ Mã Thủ Công (Manual Mapping)</span>
+        </h3>
+        <button onclick="closeMappingModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="text-xs space-y-3">
+        <p class="text-slate-500">Liên kết một mã ERP nội bộ với mã Hải quan VNACCS. Hành vi này sẽ được lưu vào Nhật Ký Kiểm Toán (Audit Trail).</p>
+        
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Mã NVL Nội Bộ (ERP TK 152):</label>
+          <input type="text" id="map-erp-code" placeholder="VD: IC-MCU-01B hoặc chọn..." class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono uppercase focus:ring-2 focus:ring-purple-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Mã NVL Hải Quan (VNACCS/HS):</label>
+          <input type="text" id="map-customs-code" placeholder="VD: IC-MCU-ARM32..." class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono uppercase focus:ring-2 focus:ring-purple-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Tỷ lệ quy đổi (Mặc định 1.0):</label>
+          <input type="number" id="map-ratio" value="1.0" step="0.1" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono focus:ring-2 focus:ring-purple-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Lý do giải trình (Bắt buộc theo chuẩn Kiểm toán):</label>
+          <textarea id="map-reason" rows="2" placeholder="VD: Linh kiện thay thế tương đương từ nhà cung cấp phụ B..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+        <button onclick="closeMappingModal()" class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">Hủy</button>
+        <button onclick="submitManualMapping()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow">Xác Nhận & Ghi Nhật Ký</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= APPLICATION JAVASCRIPT LOGIC ================= -->
+  <script>
+    /* ==========================================================================
+       GLOBAL STATE & DATA IMMUTABILITY DECLARATION (GUARDRAIL 4 & 5)
+       Raw uploaded Excel files remain strictly immutable in DOM/RAM.
+       ========================================================================== */
+    const AppState = {
+      // Immutable raw files
+      rawFiles: {
+        erp: null,
+        vnaccs: null,
+        bom: null,
+      },
+      // Immutable raw parsed datasets
+      rawDatasets: {
+        erp: [],
+        vnaccs: [],
+        bom: [],
+      },
+      // Configurable Scrap/Waste Tolerance %
+      scrapTolerancePct: 3.0,
+      // Manual mapping overrides added by accountant
+      manualMappings: [],
+      // Immutable Audit Trail entries
+      auditTrail: [],
+      // Reconciliation aggregated view
+      reconciliationResults: [],
+      unmappedItems: [],
+      activeFilter: 'all',
+      fiscalYearEnd: '2025-12-31',
+      language: 'vi',
+      cr02View: 'production',
+      cr02Lines: [],
+    };
+
+    // Initialize UI on window load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initDates();
+      calculateBcqtDeadline();
+      calculateExposure();
+      calculateSlaDeadlines();
+      setInterval(updateLiveBcqtClock, 1000);
+      setupDragDrop();
+      renderAuditTrail();
+      renderComplianceHome();
+      loadCr02Demo(false);
+    });
+
+    // Toast Notification helper
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+      
+      toastMsg.textContent = message;
+      
+      let iconHtml = '<i data-lucide="info" class="w-4 h-4 text-blue-400"></i>';
+      if (type === 'success') iconHtml = '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>';
+      if (type === 'error') iconHtml = '<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>';
+      if (type === 'warning') iconHtml = '<i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i>';
+      toastIcon.innerHTML = iconHtml;
+      lucide.createIcons();
+
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
+        btn.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-slate-700/60');
+      });
+
+      const activeSection = document.getElementById(tabId);
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeSection) activeSection.classList.remove('hidden');
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-slate-700/60');
+        activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+      }
+      lucide.createIcons();
+    }
+
+    // Modal helpers
+    function openModal(title, htmlContent) {
+      document.getElementById('modal-title').innerHTML = title;
+      document.getElementById('modal-content').innerHTML = htmlContent;
+      document.getElementById('detail-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+    function closeModal() {
+      document.getElementById('detail-modal').classList.add('hidden');
+    }
+
+    function openManualMappingModal(defaultErp = '', defaultCustoms = '') {
+      document.getElementById('map-erp-code').value = defaultErp;
+      document.getElementById('map-customs-code').value = defaultCustoms;
+      document.getElementById('map-ratio').value = '1.0';
+      document.getElementById('map-reason').value = '';
+      document.getElementById('mapping-modal').classList.remove('hidden');
+    }
+    function closeMappingModal() {
+      document.getElementById('mapping-modal').classList.add('hidden');
+    }
+
+    /* ==========================================================================
+       GUARDRAIL 4: AUDIT TRAIL LOGGING ENGINE
+       ========================================================================== */
+
+    function logAuditAction(action, target, oldValue, newValue, reason) {
+      const now = new Date();
+      const logEntry = {
+        id: `AUD-${String(AppState.auditTrail.length + 1).padStart(4, '0')}`,
+        timestamp: now.toISOString(),
+        formattedTime: now.toLocaleString('vi-VN'),
+        user: 'Kế toán Thuế / Customs Auditor',
+        action,
+        target,
+        oldValue: String(oldValue || 'None'),
+        newValue: String(newValue || 'None'),
+        reason: reason || 'Khai báo theo quy trình kiểm soát nội bộ'
+      };
+
+      AppState.auditTrail.unshift(logEntry);
+      document.getElementById('nav-audit-badge').textContent = AppState.auditTrail.length;
+      document.getElementById('audit-log-counter').textContent = `${AppState.auditTrail.length} bản ghi`;
+      renderAuditTrail();
+    }
+
+    function renderAuditTrail() {
+      const tbody = document.getElementById('audit-trail-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (AppState.auditTrail.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="py-8 text-center text-slate-400 font-sans">
+              Chưa có điều chỉnh thủ công nào được ghi nhận. Dữ liệu đối soát đang ở trạng thái nguyên bản.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      AppState.auditTrail.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
+
+        let badgeClass = 'bg-slate-200 text-slate-700';
+        if (log.action.includes('MAPPING')) badgeClass = 'bg-purple-100 text-purple-800';
+        if (log.action.includes('TOLERANCE')) badgeClass = 'bg-amber-100 text-amber-800';
+        if (log.action.includes('PAYMENT')) badgeClass = 'bg-emerald-100 text-emerald-800';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-bold text-slate-700">${log.id}</td>
+          <td class="py-2.5 px-3 text-slate-500">${log.formattedTime}</td>
+          <td class="py-2.5 px-3 text-slate-600 font-sans">${log.user}</td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${log.action}</span></td>
+          <td class="py-2.5 px-3 font-bold text-slate-800">${log.target}</td>
+          <td class="py-2.5 px-3 text-slate-500 max-w-[120px] truncate" title="${log.oldValue}">${log.oldValue}</td>
+          <td class="py-2.5 px-3 text-blue-700 font-semibold max-w-[120px] truncate" title="${log.newValue}">${log.newValue}</td>
+          <td class="py-2.5 px-4 text-slate-700 font-sans max-w-[250px] truncate" title="${log.reason}">${log.reason}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportAuditTrailJSON() {
+      if (AppState.auditTrail.length === 0) {
+        showToast('Chưa có lịch sử kiểm toán để xuất!', 'warning');
+        return;
+      }
+      const jsonStr = JSON.stringify(AppState.auditTrail, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CDMS_Audit_Trail_Log_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Đã xuất file JSON Nhật Ký Kiểm Toán!', 'success');
+    }
+
+    function exportAuditTrailExcel() {
+      if (AppState.auditTrail.length === 0) {
+        showToast('Chưa có lịch sử kiểm toán để xuất!', 'warning');
+        return;
+      }
+      const data = AppState.auditTrail.map(l => ({
+        'Mã Log': l.id,
+        'Thời Gian': l.formattedTime,
+        'Người Thực Hiện': l.user,
+        'Loại Hành Động': l.action,
+        'Mục Tiêu': l.target,
+        'Giá Trị Cũ': l.oldValue,
+        'Giá Trị Mới': l.newValue,
+        'Lý Do Giải Trình': l.reason,
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit_Trail_Log');
+      XLSX.writeFile(wb, `CDMS_Audit_Trail_Log_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showToast('Đã xuất file Excel Nhật Ký Kiểm Toán!', 'success');
+    }
+
+    /* ==========================================================================
+       MODULE 1: RECONCILIATION WITH 1-TO-N MAPPING & TOLERANCE THRESHOLDS
+       ========================================================================== */
+
+    function updateScrapTolerance(newVal) {
+      const oldVal = AppState.scrapTolerancePct;
+      const parsed = parseFloat(newVal) || 0;
+      AppState.scrapTolerancePct = Math.max(0, parsed);
+
+      document.getElementById('metric-bom-tolerance-sub').textContent = `Vượt > ${AppState.scrapTolerancePct}% (Báo động đỏ)`;
+      logAuditAction('TOLERANCE_CHANGE', 'BOM Scrap Tolerance %', `${oldVal}%`, `${AppState.scrapTolerancePct}%`, 'Điều chỉnh ngưỡng dung sai hao hụt kỹ thuật phục vụ kiểm tra sau thông quan');
+
+      showToast(`Đã cập nhật dung sai hao hụt thành ${AppState.scrapTolerancePct}%`, 'info');
+      if (AppState.reconciliationResults.length > 0) {
+        executeReconciliation();
+      }
+    }
+
+    function submitManualMapping() {
+      const erpCode = (document.getElementById('map-erp-code').value || '').trim().toUpperCase();
+      const customsCode = (document.getElementById('map-customs-code').value || '').trim().toUpperCase();
+      const ratio = parseFloat(document.getElementById('map-ratio').value) || 1.0;
+      const reason = (document.getElementById('map-reason').value || '').trim();
+
+      if (!erpCode || !customsCode) {
+        showToast('Vui lòng nhập cả Mã Nội Bộ và Mã Hải Quan!', 'error');
+        return;
+      }
+      if (!reason) {
+        showToast('Vui lòng nhập lý do giải trình theo chuẩn kiểm toán!', 'warning');
+        return;
+      }
+
+      // Check if already mapped
+      const existing = AppState.manualMappings.find(m => m.erpCode === erpCode && m.customsCode === customsCode);
+      if (existing) {
+        existing.ratio = ratio;
+      } else {
+        AppState.manualMappings.push({ erpCode, customsCode, ratio });
+      }
+
+      logAuditAction('MANUAL_MAPPING_ADD', `${erpCode} -> ${customsCode}`, 'Chưa liên kết', `Ánh xạ vào ${customsCode} (Tỷ lệ: ${ratio})`, reason);
+
+      closeMappingModal();
+      showToast(`Đã liên kết mã ${erpCode} vào mã HQ ${customsCode}!`, 'success');
+      executeReconciliation();
+    }
+
+    // Drag & Drop setup
+    function setupDragDrop() {
+      [1, 2, 3].forEach(id => {
+        const dropZone = document.getElementById(`drop-zone-${id}`);
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+          dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('border-blue-500', 'bg-blue-50/40');
+          }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+          dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50/40');
+          }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+          const dt = e.dataTransfer;
+          const files = dt.files;
+          if (files.length > 0) {
+            parseExcelFile(files[0], id);
+          }
+        }, false);
+      });
+    }
+
+    function handleFileSelect(event, fileId) {
+      const file = event.target.files[0];
+      if (file) parseExcelFile(file, fileId);
+    }
+
+    function clearFile(fileId) {
+      const keys = ['', 'erp', 'vnaccs', 'bom'];
+      const key = keys[fileId];
+      AppState.rawFiles[key] = null;
+      AppState.rawDatasets[key] = [];
+      
+      document.getElementById(`status-tag-${fileId}`).textContent = 'Chưa nạp';
+      document.getElementById(`status-tag-${fileId}`).className = 'text-xs font-medium text-slate-400';
+      document.getElementById(`filename-${fileId}`).textContent = `Kéo thả hoặc Chọn file ${key.toUpperCase()}`;
+      document.getElementById(`rows-count-${fileId}`).textContent = '0 bản ghi';
+      showToast(`Đã xóa dữ liệu file ${key.toUpperCase()}`, 'info');
+    }
+
+    // Parse Excel File locally using SheetJS ArrayBuffer
+    function parseExcelFile(file, fileId) {
+      const keys = ['', 'erp', 'vnaccs', 'bom'];
+      const key = keys[fileId];
+      
+      showToast(`Đang đọc file ${file.name}...`, 'info');
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          AppState.rawFiles[key] = file;
+          // Store immutable copy
+          AppState.rawDatasets[key] = Object.freeze(jsonData);
+
+          // Update UI
+          const statusTag = document.getElementById(`status-tag-${fileId}`);
+          statusTag.textContent = 'Đã nạp';
+          statusTag.className = 'text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded';
+          
+          document.getElementById(`filename-${fileId}`).textContent = file.name;
+          document.getElementById(`rows-count-${fileId}`).textContent = `${jsonData.length.toLocaleString('vi-VN')} bản ghi`;
+
+          showToast(`Nạp thành công ${jsonData.length} dòng từ ${file.name}`, 'success');
+        } catch (err) {
+          console.error(err);
+          showToast(`Lỗi đọc file Excel: ${err.message}`, 'error');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    // 1-to-N Aggregated Reconciliation Engine
+    async function executeReconciliation() {
+      const erpData = AppState.rawDatasets.erp;
+      const vnaccsData = AppState.rawDatasets.vnaccs;
+      const bomData = AppState.rawDatasets.bom;
+
+      if (erpData.length === 0 && vnaccsData.length === 0) {
+        showToast('Vui lòng nạp file ERP hoặc VNACCS để đối chiếu!', 'warning');
+        return;
+      }
+
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      const progressPercent = document.getElementById('progress-percent');
+      const progressStatus = document.getElementById('progress-status-text');
+
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressPercent.textContent = '0%';
+      progressStatus.textContent = 'Đang thiết lập ma trận ánh xạ 1-to-N...';
+
+      const norm = (str) => String(str || '').trim().toUpperCase();
+
+      // 1. Build ERP map by internal ERP code
+      const erpMap = new Map();
+      erpData.forEach(row => {
+        const code = norm(row['Mã NVL'] || row['Mã NVL Nội Bộ'] || row['Ma_NVL'] || row['ERP Code']);
+        if (code) {
+          erpMap.set(code, {
+            code,
+            name: row['Tên NVL'] || row['Description'] || '',
+            unit: row['ĐVT'] || row['DVT'] || 'Cái',
+            opening: Number(row['Tồn đầu kỳ'] || 0),
+            importQty: Number(row['Nhập trong kỳ'] || 0),
+            exportQty: Number(row['Xuất trong kỳ'] || 0),
+            closing: Number(row['Tồn cuối kỳ'] || 0),
+            rawRow: row
+          });
+        }
+      });
+
+      // 2. Build VNACCS map by Customs code
+      const vnaccsMap = new Map();
+      vnaccsData.forEach(row => {
+        const code = norm(row['Mã NVL Hải Quan'] || row['Mã NVL'] || row['Mã HS'] || row['Ma_NVL_HQ']);
+        if (code) {
+          vnaccsMap.set(code, {
+            code,
+            name: row['Tên NVL'] || row['Description'] || '',
+            unit: row['ĐVT'] || row['DVT'] || 'Cái',
+            importQty: Number(row['Lượng Nhập TK'] || 0),
+            exportQty: Number(row['Lượng Xuất TK'] || 0),
+            closing: Number(row['Tồn Hải Quan'] || 0),
+            rawRow: row
+          });
+        }
+      });
+
+      // 3. Build Mapping Graph: Map<CustomsCode, Array<{erpCode, ratio}>>
+      const customsToErpMapping = new Map();
+      const erpToCustomsMapping = new Map();
+
+      // From BOM / Mapping table
+      bomData.forEach(row => {
+        const customsCode = norm(row['Mã NVL Hải Quan'] || row['Mã HS'] || row['Mã NVL'] || row['Customs Code']);
+        const erpCode = norm(row['Mã NVL Nội Bộ'] || row['Mã NVL ERP'] || row['Mã NVL'] || row['ERP Code']);
+        const ratio = parseFloat(row['Tỷ Lệ Quy Đổi'] || row['Ratio'] || 1.0) || 1.0;
+
+        if (customsCode && erpCode) {
+          if (!customsToErpMapping.has(customsCode)) customsToErpMapping.set(customsCode, []);
+          const list = customsToErpMapping.get(customsCode);
+          if (!list.some(item => item.erpCode === erpCode)) {
+            list.push({ erpCode, ratio });
+          }
+          erpToCustomsMapping.set(erpCode, customsCode);
+        }
+      });
+
+      // Apply Manual Mappings
+      AppState.manualMappings.forEach(m => {
+        if (!customsToErpMapping.has(m.customsCode)) customsToErpMapping.set(m.customsCode, []);
+        const list = customsToErpMapping.get(m.customsCode);
+        if (!list.some(item => item.erpCode === m.erpCode)) {
+          list.push({ erpCode: m.erpCode, ratio: m.ratio });
+        }
+        erpToCustomsMapping.set(m.erpCode, m.customsCode);
+      });
+
+      // If a code exists with identical name in both ERP & VNACCS and not yet mapped, map 1:1
+      erpMap.forEach((_, erpCode) => {
+        if (!erpToCustomsMapping.has(erpCode) && vnaccsMap.has(erpCode)) {
+          if (!customsToErpMapping.has(erpCode)) customsToErpMapping.set(erpCode, []);
+          customsToErpMapping.get(erpCode).push({ erpCode, ratio: 1.0 });
+          erpToCustomsMapping.set(erpCode, erpCode);
+        }
+      });
+
+      // 4. Build BOM parameters map by CustomsCode or ErpCode
+      const bomParamsMap = new Map();
+      bomData.forEach(row => {
+        const key = norm(row['Mã NVL Hải Quan'] || row['Mã NVL Nội Bộ'] || row['Mã NVL']);
+        if (key) {
+          bomParamsMap.set(key, {
+            registeredBom: Number(row['Định Mức Đăng Ký'] || 0),
+            actualBom: Number(row['Lượng Tiêu Hao Thực Tế'] || 0),
+            fgCode: row['Mã Thành Phẩm'] || '',
+            registeredLoss: Number(row['Tỷ Lệ Hao Hụt'] || 0),
+            actualLoss: Number(row['Tỷ Lệ Hao Hụt Thực Tế'] || 0),
+          });
+        }
+      });
+
+      // 5. Gather all unique Customs Keys
+      const allCustomsKeys = Array.from(new Set([
+        ...vnaccsMap.keys(),
+        ...customsToErpMapping.keys()
+      ]));
+
+      const results = [];
+      const unmappedItems = [];
+      const toleranceRatio = AppState.scrapTolerancePct / 100;
+
+      // Track which ERP codes have been mapped
+      const mappedErpCodes = new Set();
+
+      const totalSteps = allCustomsKeys.length;
+      const chunkSize = 150;
+
+      for (let i = 0; i < totalSteps; i += chunkSize) {
+        const chunk = allCustomsKeys.slice(i, i + chunkSize);
+
+        chunk.forEach(customsCode => {
+          const vnaccs = vnaccsMap.get(customsCode);
+          const erpLinks = customsToErpMapping.get(customsCode) || [];
+
+          // Sum ERP stock for all mapped ERP codes
+          let totalErpStock = 0;
+          let mappedErpDetails = [];
+
+          erpLinks.forEach(link => {
+            const erpItem = erpMap.get(link.erpCode);
+            if (erpItem) {
+              const adjustedStock = erpItem.closing * link.ratio;
+              totalErpStock += adjustedStock;
+              mappedErpDetails.push({
+                erpCode: link.erpCode,
+                name: erpItem.name,
+                stock: erpItem.closing,
+                ratio: link.ratio,
+                adjustedStock
+              });
+              mappedErpCodes.add(link.erpCode);
+            } else {
+              // Linked ERP code not present in ERP file
+              mappedErpDetails.push({
+                erpCode: link.erpCode,
+                name: 'Chưa có trên Sổ Kho ERP',
+                stock: 0,
+                ratio: link.ratio,
+                adjustedStock: 0
+              });
+            }
+          });
+
+          const customsStock = vnaccs ? vnaccs.closing : 0;
+          const delta = totalErpStock - customsStock;
+
+          // Check BOM
+          const bom = bomParamsMap.get(customsCode) || (erpLinks[0] ? bomParamsMap.get(erpLinks[0].erpCode) : null);
+          let bomRegistered = bom ? bom.registeredBom : null;
+          let bomActual = bom ? bom.actualBom : null;
+
+          let isBomTolerated = false;
+          let isBomRedAlert = false;
+
+          if (bom && bom.registeredBom > 0 && bom.actualBom > bom.registeredBom) {
+            const allowedLimit = bom.registeredBom * (1 + toleranceRatio);
+            if (bom.actualBom <= allowedLimit) {
+              isBomTolerated = true; // Yellow: Within tolerance
+            } else {
+              isBomRedAlert = true; // Red: Exceeds tolerance
+            }
+          }
+
+          let isUnmapped = !vnaccs || erpLinks.length === 0;
+
+          let status = 'safe';
+          let statusText = 'Khớp chuẩn';
+
+          if (isUnmapped) {
+            status = 'unmapped';
+            statusText = !vnaccs ? 'Thiếu Tờ Khai HQ' : 'Chưa có mã ERP liên kết';
+          } else if (isBomRedAlert) {
+            status = 'bom_red';
+            statusText = `VƯỢT DUNG SAI (${AppState.scrapTolerancePct}%)`;
+          } else if (isBomTolerated) {
+            status = 'bom_tolerated';
+            statusText = `Trong dung sai (≤ ${AppState.scrapTolerancePct}%)`;
+          } else if (Math.abs(delta) > 0.0001) {
+            if (delta > 0) {
+              status = 'danger';
+              statusText = 'Tồn ERP > HQ (+Δ: Nguy cơ nợ thuế)';
+            } else {
+              status = 'warning';
+              statusText = 'Tồn HQ > ERP (-Δ: Âm kho)';
+            }
+          }
+
+          results.push({
+            customsCode,
+            erpCodesList: erpLinks.map(l => l.erpCode).join(', ') || 'Chưa ánh xạ',
+            mappedErpDetails,
+            name: (vnaccs ? vnaccs.name : '') || (mappedErpDetails[0] ? mappedErpDetails[0].name : 'Chưa định danh'),
+            unit: (vnaccs ? vnaccs.unit : '') || 'Cái',
+            totalErpStock,
+            customsStock,
+            delta,
+            bomRegistered,
+            bomActual,
+            isBomTolerated,
+            isBomRedAlert,
+            isUnmapped,
+            status,
+            statusText,
+            vnaccsDetails: vnaccs,
+            bomDetails: bom
+          });
+        });
+
+        const pct = Math.round(((i + chunk.length) / totalSteps) * 100);
+        progressBar.style.width = `${pct}%`;
+        progressPercent.textContent = `${pct}%`;
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      // 6. Find all ERP codes completely missing in mapping
+      erpMap.forEach((erpItem, erpCode) => {
+        if (!mappedErpCodes.has(erpCode)) {
+          unmappedItems.push({
+            source: 'ERP (TK 152)',
+            code: erpCode,
+            name: erpItem.name,
+            unit: erpItem.unit,
+            stock: erpItem.closing,
+          });
+        }
+      });
+
+      // Find Customs codes with no mapped ERP
+      vnaccsMap.forEach((vnItem, customsCode) => {
+        const links = customsToErpMapping.get(customsCode);
+        if (!links || links.length === 0) {
+          unmappedItems.push({
+            source: 'Hải Quan VNACCS',
+            code: customsCode,
+            name: vnItem.name,
+            unit: vnItem.unit,
+            stock: vnItem.closing,
+          });
+        }
+      });
+
+      AppState.reconciliationResults = results;
+      AppState.unmappedItems = unmappedItems;
+
+      setTimeout(() => {
+        progressContainer.classList.add('hidden');
+        renderReconciliationSummary();
+        renderReconciliationTable();
+        showToast(`Đối soát hoàn tất ${results.length} cụm mã! Tìm thấy ${unmappedItems.length} mã chưa ánh xạ.`, 'success');
+      }, 300);
+    }
+
+    function renderReconciliationSummary() {
+      const results = AppState.reconciliationResults;
+      const total = results.length;
+      const matched = results.filter(r => Math.abs(r.delta) < 0.0001 && !r.isUnmapped && !r.isBomRedAlert).length;
+      const discrepancy = results.filter(r => Math.abs(r.delta) >= 0.0001 && !r.isUnmapped).length;
+      const bomRed = results.filter(r => r.isBomRedAlert).length;
+      const unmapped = AppState.unmappedItems.length;
+
+      document.getElementById('metric-total-items').textContent = total.toLocaleString('vi-VN');
+      document.getElementById('metric-matched-items').textContent = matched.toLocaleString('vi-VN');
+      document.getElementById('metric-discrepancy-items').textContent = discrepancy.toLocaleString('vi-VN');
+      document.getElementById('metric-bom-violations').textContent = bomRed.toLocaleString('vi-VN');
+      document.getElementById('metric-unmapped-items').textContent = unmapped.toLocaleString('vi-VN');
+      document.getElementById('unmapped-count-badge').textContent = unmapped;
+
+      document.getElementById('reconciliation-summary').classList.remove('hidden');
+      document.getElementById('results-table-container').classList.remove('hidden');
+    }
+
+    function renderReconciliationTable() {
+      const tbody = document.getElementById('reconciliation-tbody');
+      tbody.innerHTML = '';
+
+      const filter = AppState.activeFilter;
+      const search = (document.getElementById('table-search-input').value || '').trim().toLowerCase();
+
+      // If user selected 'unmapped' filter, render the dedicated Unmapped Items view
+      if (filter === 'unmapped') {
+        renderUnmappedItemsTable();
+        return;
+      }
+
+      let filtered = AppState.reconciliationResults;
+
+      if (filter === 'discrepancy') {
+        filtered = filtered.filter(r => Math.abs(r.delta) >= 0.0001);
+      } else if (filter === 'bom-red') {
+        filtered = filtered.filter(r => r.isBomRedAlert);
+      } else if (filter === 'bom-tolerated') {
+        filtered = filtered.filter(r => r.isBomTolerated);
+      }
+
+      if (search) {
+        filtered = filtered.filter(r => 
+          r.customsCode.toLowerCase().includes(search) || 
+          r.erpCodesList.toLowerCase().includes(search) || 
+          r.name.toLowerCase().includes(search)
+        );
+      }
+
+      document.getElementById('table-rows-showing').textContent = `Hiển thị ${filtered.length.toLocaleString('vi-VN')} / ${AppState.reconciliationResults.length.toLocaleString('vi-VN')} cụm mã`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="py-8 text-center text-slate-400">
+              Không có dữ liệu phù hợp với bộ lọc hiện tại.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtered.slice(0, 500).forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+        let badgeHtml = '';
+        if (row.status === 'safe') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Khớp</span>';
+        } else if (row.status === 'bom_red') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">Vượt Dung Sai (Đỏ)</span>';
+        } else if (row.status === 'bom_tolerated') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Trong Dung Sai (Vàng)</span>';
+        } else if (row.status === 'danger') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Lệch Tồn (+)</span>';
+        } else if (row.status === 'warning') {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Lệch Tồn (-)</span>';
+        } else {
+          badgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">Chưa Khớp</span>';
+        }
+
+        const deltaFormatted = row.delta !== 0 ? (row.delta > 0 ? `+${row.delta.toLocaleString('vi-VN')}` : row.delta.toLocaleString('vi-VN')) : '0';
+        const deltaClass = row.delta > 0 ? 'text-rose-600 font-bold' : (row.delta < 0 ? 'text-amber-600 font-bold' : 'text-slate-500');
+
+        const erpBadge = row.mappedErpDetails.length > 1 ? `<span class="ml-1 text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded-full">Gộp ${row.mappedErpDetails.length} mã</span>` : '';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-bold text-slate-800">${row.customsCode}</td>
+          <td class="py-2.5 px-3 font-mono text-slate-600 max-w-[150px] truncate" title="${row.erpCodesList}">${row.erpCodesList} ${erpBadge}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-700 max-w-[180px] truncate" title="${row.name}">${row.name}</td>
+          <td class="py-2.5 px-2 text-center text-slate-500">${row.unit}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-blue-700">${row.totalErpStock.toLocaleString('vi-VN')}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-medium">${row.customsStock.toLocaleString('vi-VN')}</td>
+          <td class="py-2.5 px-3 text-right font-mono ${deltaClass}">${deltaFormatted}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-600">${row.bomRegistered !== null ? row.bomRegistered.toFixed(4) : '-'}</td>
+          <td class="py-2.5 px-3 text-right font-mono ${row.isBomRedAlert ? 'text-rose-600 font-bold' : (row.isBomTolerated ? 'text-amber-600 font-bold' : 'text-slate-600')}">${row.bomActual !== null ? row.bomActual.toFixed(4) : '-'}</td>
+          <td class="py-2.5 px-3 text-center">${badgeHtml}</td>
+          <td class="py-2.5 px-3 text-center">
+            <button onclick="viewRowDetail('${row.customsCode}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold hover:underline">Chi tiết 1:N</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Dedicated Table for Unmapped Items Alert Tab
+    function renderUnmappedItemsTable() {
+      const tbody = document.getElementById('reconciliation-tbody');
+      tbody.innerHTML = '';
+
+      const items = AppState.unmappedItems;
+      document.getElementById('table-rows-showing').textContent = `Hiển thị ${items.length} mặt hàng chưa liên kết mã`;
+
+      if (items.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="py-8 text-center text-emerald-600 font-medium">
+              Tuyệt vời! 100% các mặt hàng ERP và Hải quan đã được khớp mã hoàn chỉnh.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-purple-50/40 transition border-b border-slate-100';
+
+        const isFromErp = item.source.includes('ERP');
+        const defaultErp = isFromErp ? item.code : '';
+        const defaultCustoms = !isFromErp ? item.code : '';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-bold ${!isFromErp ? 'text-purple-700' : 'text-slate-400'}">${!isFromErp ? item.code : '(Chưa có mã HQ)'}</td>
+          <td class="py-2.5 px-3 font-mono font-bold ${isFromErp ? 'text-blue-700' : 'text-slate-400'}">${isFromErp ? item.code : '(Chưa có mã ERP)'}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${item.name}</td>
+          <td class="py-2.5 px-2 text-center text-slate-500">${item.unit}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold ${isFromErp ? 'text-blue-700' : 'text-slate-400'}">${isFromErp ? item.stock.toLocaleString('vi-VN') : '-'}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold ${!isFromErp ? 'text-purple-700' : 'text-slate-400'}">${!isFromErp ? item.stock.toLocaleString('vi-VN') : '-'}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-400">-</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-400">-</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-400">-</td>
+          <td class="py-2.5 px-3 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isFromErp ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">Chưa Khớp (${item.source})</span>
+          </td>
+          <td class="py-2.5 px-3 text-center">
+            <button onclick="openManualMappingModal('${defaultErp}', '${defaultCustoms}')" class="inline-flex items-center space-x-1 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-bold shadow-sm">
+              <i data-lucide="link" class="w-3 h-3"></i>
+              <span>Ánh xạ ngay</span>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    function filterResults(filterType) {
+      AppState.activeFilter = filterType;
+      ['all', 'discrepancy', 'bom-red', 'bom-tolerated', 'unmapped'].forEach(f => {
+        const btn = document.getElementById(`filter-${f}`);
+        if (!btn) return;
+        if (f === filterType) {
+          btn.className = 'px-3 py-1 font-semibold rounded-md bg-blue-600 text-white';
+        } else {
+          btn.className = 'px-3 py-1 font-semibold rounded-md text-slate-600 hover:text-slate-900';
+        }
+      });
+      renderReconciliationTable();
+    }
+
+    function searchTable() {
+      renderReconciliationTable();
+    }
+
+    function viewRowDetail(customsCode) {
+      const item = AppState.reconciliationResults.find(r => r.customsCode === customsCode);
+      if (!item) return;
+
+      const title = `<i data-lucide="info" class="w-5 h-5 text-blue-600"></i><span>Chi Tiết Ma Trận 1-to-N: Mã HQ ${item.customsCode}</span>`;
+      
+      let erpBreakdownHtml = '';
+      if (item.mappedErpDetails.length > 0) {
+        erpBreakdownHtml = `
+          <table class="w-full text-left text-xs border border-slate-200 mt-2 rounded overflow-hidden">
+            <thead class="bg-blue-50 text-blue-900 font-bold">
+              <tr>
+                <th class="p-2">Mã ERP</th>
+                <th class="p-2">Tên Mặt Hàng</th>
+                <th class="p-2 text-right">Tồn Kho ERP</th>
+                <th class="p-2 text-center">Hệ số</th>
+                <th class="p-2 text-right">Tồn Quy Đổi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 font-mono text-[11px]">
+              ${item.mappedErpDetails.map(sub => `
+                <tr>
+                  <td class="p-2 font-bold text-slate-800">${sub.erpCode}</td>
+                  <td class="p-2 text-slate-600 font-sans">${sub.name}</td>
+                  <td class="p-2 text-right">${sub.stock.toLocaleString('vi-VN')}</td>
+                  <td class="p-2 text-center text-slate-500">x${sub.ratio}</td>
+                  <td class="p-2 text-right font-bold text-blue-700">${sub.adjustedStock.toLocaleString('vi-VN')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
+              <tr>
+                <td colspan="4" class="p-2 text-right font-sans">TỔNG TỒN ERP GỘP (Σ):</td>
+                <td class="p-2 text-right text-blue-800 font-mono">${item.totalErpStock.toLocaleString('vi-VN')}</td>
+              </tr>
+            </tfoot>
+          </table>
+        `;
+      } else {
+        erpBreakdownHtml = '<p class="text-rose-600 italic mt-2">Chưa có mã ERP nào được ánh xạ vào mã Hải quan này.</p>';
+      }
+
+      const html = `
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <p class="font-bold text-slate-800 text-sm">${item.name}</p>
+          <p class="text-slate-500 text-xs mt-0.5">Mã Hải quan VNACCS: <b class="font-mono text-slate-800">${item.customsCode}</b> | Trạng thái: <span class="font-bold text-rose-600">${item.statusText}</span></p>
+        </div>
+
+        <div class="p-3 bg-white rounded-lg border border-slate-200 mt-2">
+          <h5 class="font-bold text-blue-800 border-b pb-1">1. Các Mã ERP Nội Bộ Được Ánh Xạ (1-to-N Mapping)</h5>
+          ${erpBreakdownHtml}
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-2">
+          <div class="p-3 bg-white rounded-lg border border-slate-200">
+            <h5 class="font-bold text-slate-700 border-b pb-1 mb-1">2. Tồn Theo Tờ Khai Hải Quan</h5>
+            <p class="text-xs">Tồn VNACCS: <b class="font-mono text-slate-900">${item.customsStock.toLocaleString('vi-VN')}</b> ${item.unit}</p>
+            <p class="text-xs text-rose-600 font-bold mt-1">Chênh lệch (Delta): <span class="font-mono">${item.delta.toLocaleString('vi-VN')}</span></p>
+          </div>
+
+          <div class="p-3 bg-white rounded-lg border border-slate-200">
+            <h5 class="font-bold text-purple-700 border-b pb-1 mb-1">3. Định Mức & Dung Sai Cho Phép (${AppState.scrapTolerancePct}%)</h5>
+            <p class="text-xs">Định mức đăng ký: <b class="font-mono">${item.bomRegistered !== null ? item.bomRegistered : '-'}</b></p>
+            <p class="text-xs">Tiêu hao thực tế: <b class="font-mono ${item.isBomRedAlert ? 'text-rose-600 font-bold' : ''}">${item.bomActual !== null ? item.bomActual : '-'}</b></p>
+            <p class="text-[11px] mt-1 ${item.isBomRedAlert ? 'text-rose-600 font-bold' : (item.isBomTolerated ? 'text-amber-600' : 'text-emerald-600')}">
+              ${item.isBomRedAlert ? `⚠️ VƯỢT DUNG SAI ${AppState.scrapTolerancePct}%: Nguy cơ cao bị ấn định thuế trong PCA!` : (item.isBomTolerated ? `✓ Nằm trong dung sai hao hụt cho phép (≤ ${AppState.scrapTolerancePct}%).` : '✓ Khớp định mức.')}
+            </p>
+          </div>
+        </div>
+      `;
+
+      openModal(title, html);
+    }
+
+    // Export Multi-Sheet Excel Reconciliation Report
+    function exportReconciliationReport() {
+      if (AppState.reconciliationResults.length === 0) {
+        showToast('Không có dữ liệu đối chiếu để xuất!', 'warning');
+        return;
+      }
+
+      showToast('Đang tạo file Excel Báo Cáo Đối Chiếu...', 'info');
+
+      // Sheet 1: Tổng hợp đối chiếu 1-to-N
+      const sheet1Data = AppState.reconciliationResults.map(r => ({
+        'Mã Hải Quan VNACCS': r.customsCode,
+        'Danh Sách Mã ERP Gộp (1:N)': r.erpCodesList,
+        'Tên Nguyên Vật Liệu': r.name,
+        'ĐVT': r.unit,
+        'Tổng Tồn Kho ERP (Σ)': r.totalErpStock,
+        'Tồn Kho Hải Quan': r.customsStock,
+        'Chênh Lệch (Delta)': r.delta,
+        'Định Mức Đăng Ký': r.bomRegistered || '',
+        'Tiêu Hao Thực Tế': r.bomActual || '',
+        'Dung Sai Cho Phép (%)': `${AppState.scrapTolerancePct}%`,
+        'Trạng Thái Rủi Ro': r.statusText,
+      }));
+
+      // Sheet 2: Danh sách Vượt Dung Sai (Báo Động Đỏ)
+      const sheet2Data = AppState.reconciliationResults.filter(r => r.isBomRedAlert).map(r => ({
+        'Mã Hải Quan': r.customsCode,
+        'Mã ERP Gộp': r.erpCodesList,
+        'Tên Mặt Hàng': r.name,
+        'Định Mức ĐK': r.bomRegistered,
+        'Tiêu Hao TT': r.bomActual,
+        'Tỷ Lệ Vượt (%)': (((r.bomActual - r.bomRegistered) / r.bomRegistered) * 100).toFixed(2) + '%',
+        'Ngưỡng Dung Sai Cho Phép': `${AppState.scrapTolerancePct}%`,
+        'Đánh Giá Rủi Ro': 'VƯỢT DUNG SAI - NGUY CƠ ẤN ĐỊNH THUẾ PCA'
+      }));
+
+      // Sheet 3: Danh sách Chưa Ánh Xạ
+      const sheet3Data = AppState.unmappedItems.map(u => ({
+        'Nguồn Phát Sinh': u.source,
+        'Mã Mặt Hàng': u.code,
+        'Tên Mặt Hàng': u.name,
+        'ĐVT': u.unit,
+        'Số Lượng Tồn Kho': u.stock,
+        'Khuyến Nghị Kiểm Toán': 'Cần bổ sung bảng ánh xạ hoặc giải trình nội bộ'
+      }));
+
+      // Sheet 4: Lịch sử Audit Trail
+      const sheet4Data = AppState.auditTrail.map(l => ({
+        'Mã Log': l.id,
+        'Thời Gian': l.formattedTime,
+        'Người Thực Hiện': l.user,
+        'Hành Động': l.action,
+        'Đối Tượng': l.target,
+        'Giá Trị Cũ': l.oldValue,
+        'Giá Trị Mới': l.newValue,
+        'Lý Do': l.reason,
+      }));
+
+      // CR-02: Existing reconciliation export follows the active UI language too.
+      const englishHeaders = {
+        'Mã Hải Quan VNACCS': 'VNACCS Customs Code', 'Danh Sách Mã ERP Gộp (1:N)': 'Aggregated ERP Codes (1:N)', 'Tên Nguyên Vật Liệu': 'Material Description', 'ĐVT': 'UOM', 'Tổng Tồn Kho ERP (Σ)': 'Total ERP Stock (Σ)', 'Tồn Kho Hải Quan': 'Customs Stock', 'Chênh Lệch (Delta)': 'Variance (Delta)', 'Định Mức Đăng Ký': 'Registered BOM', 'Tiêu Hao Thực Tế': 'Actual Consumption', 'Dung Sai Cho Phép (%)': 'Allowed Tolerance (%)', 'Trạng Thái Rủi Ro': 'Risk Status',
+        'Mã Hải Quan': 'Customs Code', 'Mã ERP Gộp': 'Aggregated ERP Codes', 'Tên Mặt Hàng': 'Item Description', 'Định Mức ĐK': 'Registered BOM', 'Tiêu Hao TT': 'Actual Consumption', 'Tỷ Lệ Vượt (%)': 'Excess Rate (%)', 'Ngưỡng Dung Sai Cho Phép': 'Allowed Tolerance', 'Đánh Giá Rủi Ro': 'Risk Assessment',
+        'Nguồn Phát Sinh': 'Source', 'Mã Mặt Hàng': 'Item Code', 'Số Lượng Tồn Kho': 'Stock Quantity', 'Khuyến Nghị Kiểm Toán': 'Audit Recommendation',
+        'Mã Log': 'Log ID', 'Thời Gian': 'Timestamp', 'Người Thực Hiện': 'Performed By', 'Hành Động': 'Action', 'Đối Tượng': 'Target', 'Giá Trị Cũ': 'Previous Value', 'Giá Trị Mới': 'New Value', 'Lý Do': 'Reason'
+      };
+      const localizeRows = rows => AppState.language === 'en' ? rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [englishHeaders[key] || key, value]))) : rows;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(localizeRows(sheet1Data)), AppState.language === 'en' ? 'Reconciliation_1_to_N' : 'Doi_Chieu_1_to_N');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(localizeRows(sheet2Data)), AppState.language === 'en' ? 'BOM_Over_Tolerance' : 'BOM_Vuot_Dung_Sai_Do');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(localizeRows(sheet3Data)), AppState.language === 'en' ? 'Unmapped_Alerts' : 'Canh_Bao_Chua_Anh_Xa');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(localizeRows(sheet4Data)), 'Audit_Trail_Log');
+
+      XLSX.writeFile(wb, `CDMS_${AppState.language === 'en' ? 'Reconciliation_Report_EN' : 'Bao_Cao_Doi_Chieu_VN'}.xlsx`);
+      showToast(AppState.language === 'en' ? 'Reconciliation report downloaded.' : 'Đã tải xuống file Excel Báo Cáo Đối Chiếu!', 'success');
+    }
+
+    // Generate & Download 3 Sample Excel Templates (Demonstrating 1-to-N Mapping)
+    function downloadSampleExcelTemplates() {
+      showToast('Đang tạo bộ 3 file Excel mẫu (Hỗ trợ 1:N)...', 'info');
+
+      // Sample 1: ERP TK 152 with sub-parts
+      const erpSample = [
+        { 'Mã NVL': 'IC-MCU-01A', 'Tên NVL': 'Vi điều khiển ARM 32-bit (Hãng NXP - Rev A)', 'ĐVT': 'Con', 'Tồn đầu kỳ': 3000, 'Nhập trong kỳ': 12000, 'Xuất trong kỳ': 11000, 'Tồn cuối kỳ': 4000 },
+        { 'Mã NVL': 'IC-MCU-01B', 'Tên NVL': 'Vi điều khiển ARM 32-bit (Hãng ST - Rev B)', 'ĐVT': 'Con', 'Tồn đầu kỳ': 2000, 'Nhập trong kỳ': 8000, 'Xuất trong kỳ': 7000, 'Tồn cuối kỳ': 3000 },
+        { 'Mã NVL': 'RES-SMD-02', 'Tên NVL': 'Điện trở dán 10k Ohm SMD 0805', 'ĐVT': 'Cuộn', 'Tồn đầu kỳ': 100, 'Nhập trong kỳ': 500, 'Xuất trong kỳ': 420, 'Tồn cuối kỳ': 180 },
+        { 'Mã NVL': 'CAP-ELEC-03', 'Tên NVL': 'Tụ điện nhôm 100uF 25V', 'ĐVT': 'Con', 'Tồn đầu kỳ': 15000, 'Nhập trong kỳ': 50000, 'Xuất trong kỳ': 48000, 'Tồn cuối kỳ': 17000 },
+        { 'Mã NVL': 'PCB-FR4-04', 'Tên NVL': 'Bo mạch in 4 lớp chuẩn FR4', 'ĐVT': 'Miếng', 'Tồn đầu kỳ': 2000, 'Nhập trong kỳ': 10000, 'Xuất trong kỳ': 9500, 'Tồn cuối kỳ': 2500 },
+        { 'Mã NVL': 'CONN-USB-05', 'Tên NVL': 'Đầu cắm Type-C SMD', 'ĐVT': 'Cái', 'Tồn đầu kỳ': 8000, 'Nhập trong kỳ': 30000, 'Xuất trong kỳ': 27000, 'Tồn cuối kỳ': 11000 },
+        { 'Mã NVL': 'SCR-M2-06', 'Tên NVL': 'Ốc vít mạ niken M2x5mm', 'ĐVT': 'Túi', 'Tồn đầu kỳ': 300, 'Nhập trong kỳ': 1000, 'Xuất trong kỳ': 900, 'Tồn cuối kỳ': 400 },
+        { 'Mã NVL': 'TAPE-3M-11', 'Tên NVL': 'Băng keo chịu nhiệt 3M (Mua nội địa)', 'ĐVT': 'Cuộn', 'Tồn đầu kỳ': 80, 'Nhập trong kỳ': 150, 'Xuất trong kỳ': 130, 'Tồn cuối kỳ': 100 },
+      ];
+
+      // Sample 2: VNACCS Declarations using generic customs code
+      const vnaccsSample = [
+        { 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Tên NVL': 'Vi điều khiển ARM 32-bit (HS 85423100)', 'ĐVT': 'Con', 'Lượng Nhập TK': 20000, 'Lượng Xuất TK': 18500, 'Tồn Hải Quan': 6500 }, // Gộp 01A + 01B = 7000 -> Delta = +500
+        { 'Mã NVL Hải Quan': 'RES-SMD-02', 'Tên NVL': 'Điện trở dán 10k Ohm SMD 0805', 'ĐVT': 'Cuộn', 'Lượng Nhập TK': 500, 'Lượng Xuất TK': 420, 'Tồn Hải Quan': 180 },
+        { 'Mã NVL Hải Quan': 'CAP-ELEC-03', 'Tên NVL': 'Tụ điện nhôm 100uF 25V', 'ĐVT': 'Con', 'Lượng Nhập TK': 50000, 'Lượng Xuất TK': 47000, 'Tồn Hải Quan': 18000 },
+        { 'Mã NVL Hải Quan': 'PCB-FR4-04', 'Tên NVL': 'Bo mạch in 4 lớp chuẩn FR4', 'ĐVT': 'Miếng', 'Lượng Nhập TK': 10000, 'Lượng Xuất TK': 9500, 'Tồn Hải Quan': 2500 },
+        { 'Mã NVL Hải Quan': 'CONN-USB-05', 'Tên NVL': 'Đầu cắm Type-C SMD', 'ĐVT': 'Cái', 'Lượng Nhập TK': 30000, 'Lượng Xuất TK': 27000, 'Tồn Hải Quan': 11000 },
+        { 'Mã NVL Hải Quan': 'SCR-M2-06', 'Tên NVL': 'Ốc vít mạ niken M2x5mm', 'ĐVT': 'Túi', 'Lượng Nhập TK': 1000, 'Lượng Xuất TK': 850, 'Tồn Hải Quan': 450 },
+        { 'Mã NVL Hải Quan': 'SOL-WIRE-99', 'Tên NVL': 'Thiếc hàn không chì (Chưa có trên ERP)', 'ĐVT': 'Kg', 'Lượng Nhập TK': 500, 'Lượng Xuất TK': 300, 'Tồn Hải Quan': 200 },
+      ];
+
+      // Sample 3: BOM Mapping Table (1 Customs to 2 ERP codes)
+      const bomSample = [
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Mã NVL Nội Bộ': 'IC-MCU-01A', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0150, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Mã NVL Nội Bộ': 'IC-MCU-01B', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0150, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'RES-SMD-02', 'Mã NVL Nội Bộ': 'RES-SMD-02', 'Định Mức Đăng Ký': 0.0500, 'Lượng Tiêu Hao Thực Tế': 0.0500, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'CAP-ELEC-03', 'Mã NVL Nội Bộ': 'CAP-ELEC-03', 'Định Mức Đăng Ký': 4.0000, 'Lượng Tiêu Hao Thực Tế': 4.0800, 'Tỷ Lệ Hao Hụt': 2.0, 'Tỷ Lệ Quy Đổi': 1.0 }, // +2.0% -> Trong dung sai 3% (Yellow)
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'PCB-FR4-04', 'Mã NVL Nội Bộ': 'PCB-FR4-04', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0000, 'Tỷ Lệ Hao Hụt': 0.5, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'CONN-USB-05', 'Mã NVL Nội Bộ': 'CONN-USB-05', 'Định Mức Đăng Ký': 2.0000, 'Lượng Tiêu Hao Thực Tế': 2.1000, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 }, // +5.0% -> Vượt dung sai 3% (Red Alert)
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'SCR-M2-06', 'Mã NVL Nội Bộ': 'SCR-M2-06', 'Định Mức Đăng Ký': 0.0800, 'Lượng Tiêu Hao Thực Tế': 0.0800, 'Tỷ Lệ Hao Hụt': 2.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(erpSample), 'ERP_TK152');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vnaccsSample), 'VNACCS_To_Khai');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bomSample), 'BOM_Mapping_1toN');
+      XLSX.writeFile(wb, 'CDMS_Mau_Du_Lieu_1toN.xlsx');
+
+      showToast('Đã tải xuống file Excel mẫu 1-to-N!', 'success');
+    }
+
+    // 1-Click Load Demo Data with 1-to-N mapping and Edge cases
+    function quickLoadDemoData() {
+      AppState.rawDatasets.erp = Object.freeze([
+        { 'Mã NVL': 'IC-MCU-01A', 'Tên NVL': 'Vi điều khiển ARM 32-bit (NXP - Rev A)', 'ĐVT': 'Con', 'Tồn đầu kỳ': 3000, 'Nhập trong kỳ': 12000, 'Xuất trong kỳ': 11000, 'Tồn cuối kỳ': 4000 },
+        { 'Mã NVL': 'IC-MCU-01B', 'Tên NVL': 'Vi điều khiển ARM 32-bit (ST - Rev B)', 'ĐVT': 'Con', 'Tồn đầu kỳ': 2000, 'Nhập trong kỳ': 8000, 'Xuất trong kỳ': 7000, 'Tồn cuối kỳ': 3000 },
+        { 'Mã NVL': 'RES-SMD-02', 'Tên NVL': 'Điện trở dán 10k Ohm SMD 0805', 'ĐVT': 'Cuộn', 'Tồn đầu kỳ': 100, 'Nhập trong kỳ': 500, 'Xuất trong kỳ': 420, 'Tồn cuối kỳ': 180 },
+        { 'Mã NVL': 'CAP-ELEC-03', 'Tên NVL': 'Tụ điện nhôm 100uF 25V', 'ĐVT': 'Con', 'Tồn đầu kỳ': 15000, 'Nhập trong kỳ': 50000, 'Xuất trong kỳ': 48000, 'Tồn cuối kỳ': 17000 },
+        { 'Mã NVL': 'PCB-FR4-04', 'Tên NVL': 'Bo mạch in 4 lớp chuẩn FR4', 'ĐVT': 'Miếng', 'Tồn đầu kỳ': 2000, 'Nhập trong kỳ': 10000, 'Xuất trong kỳ': 9500, 'Tồn cuối kỳ': 2500 },
+        { 'Mã NVL': 'CONN-USB-05', 'Tên NVL': 'Đầu cắm Type-C SMD', 'ĐVT': 'Cái', 'Tồn đầu kỳ': 8000, 'Nhập trong kỳ': 30000, 'Xuất trong kỳ': 27000, 'Tồn cuối kỳ': 11000 },
+        { 'Mã NVL': 'SCR-M2-06', 'Tên NVL': 'Ốc vít mạ niken M2x5mm', 'ĐVT': 'Túi', 'Tồn đầu kỳ': 300, 'Nhập trong kỳ': 1000, 'Xuất trong kỳ': 900, 'Tồn cuối kỳ': 400 },
+        { 'Mã NVL': 'TAPE-3M-11', 'Tên NVL': 'Băng keo chịu nhiệt 3M (Mua nội địa)', 'ĐVT': 'Cuộn', 'Tồn đầu kỳ': 80, 'Nhập trong kỳ': 150, 'Xuất trong kỳ': 130, 'Tồn cuối kỳ': 100 },
+      ]);
+
+      AppState.rawDatasets.vnaccs = Object.freeze([
+        { 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Tên NVL': 'Vi điều khiển ARM 32-bit (HS 85423100)', 'ĐVT': 'Con', 'Lượng Nhập TK': 20000, 'Lượng Xuất TK': 18500, 'Tồn Hải Quan': 6500 },
+        { 'Mã NVL Hải Quan': 'RES-SMD-02', 'Tên NVL': 'Điện trở dán 10k Ohm SMD 0805', 'ĐVT': 'Cuộn', 'Lượng Nhập TK': 500, 'Lượng Xuất TK': 420, 'Tồn Hải Quan': 180 },
+        { 'Mã NVL Hải Quan': 'CAP-ELEC-03', 'Tên NVL': 'Tụ điện nhôm 100uF 25V', 'ĐVT': 'Con', 'Lượng Nhập TK': 50000, 'Lượng Xuất TK': 47000, 'Tồn Hải Quan': 18000 },
+        { 'Mã NVL Hải Quan': 'PCB-FR4-04', 'Tên NVL': 'Bo mạch in 4 lớp chuẩn FR4', 'ĐVT': 'Miếng', 'Lượng Nhập TK': 10000, 'Lượng Xuất TK': 9500, 'Tồn Hải Quan': 2500 },
+        { 'Mã NVL Hải Quan': 'CONN-USB-05', 'Tên NVL': 'Đầu cắm Type-C SMD', 'ĐVT': 'Cái', 'Lượng Nhập TK': 30000, 'Lượng Xuất TK': 27000, 'Tồn Hải Quan': 11000 },
+        { 'Mã NVL Hải Quan': 'SCR-M2-06', 'Tên NVL': 'Ốc vít mạ niken M2x5mm', 'ĐVT': 'Túi', 'Lượng Nhập TK': 1000, 'Lượng Xuất TK': 850, 'Tồn Hải Quan': 450 },
+        { 'Mã NVL Hải Quan': 'SOL-WIRE-99', 'Tên NVL': 'Thiếc hàn không chì (Chưa có trên ERP)', 'ĐVT': 'Kg', 'Lượng Nhập TK': 500, 'Lượng Xuất TK': 300, 'Tồn Hải Quan': 200 },
+      ]);
+
+      AppState.rawDatasets.bom = Object.freeze([
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Mã NVL Nội Bộ': 'IC-MCU-01A', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0150, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'IC-MCU-ARM32', 'Mã NVL Nội Bộ': 'IC-MCU-01B', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0150, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'RES-SMD-02', 'Mã NVL Nội Bộ': 'RES-SMD-02', 'Định Mức Đăng Ký': 0.0500, 'Lượng Tiêu Hao Thực Tế': 0.0500, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'CAP-ELEC-03', 'Mã NVL Nội Bộ': 'CAP-ELEC-03', 'Định Mức Đăng Ký': 4.0000, 'Lượng Tiêu Hao Thực Tế': 4.0800, 'Tỷ Lệ Hao Hụt': 2.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'PCB-FR4-04', 'Mã NVL Nội Bộ': 'PCB-FR4-04', 'Định Mức Đăng Ký': 1.0000, 'Lượng Tiêu Hao Thực Tế': 1.0000, 'Tỷ Lệ Hao Hụt': 0.5, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'CONN-USB-05', 'Mã NVL Nội Bộ': 'CONN-USB-05', 'Định Mức Đăng Ký': 2.0000, 'Lượng Tiêu Hao Thực Tế': 2.1000, 'Tỷ Lệ Hao Hụt': 1.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+        { 'Mã Thành Phẩm': 'FG-IOT-HUB-01', 'Mã NVL Hải Quan': 'SCR-M2-06', 'Mã NVL Nội Bộ': 'SCR-M2-06', 'Định Mức Đăng Ký': 0.0800, 'Lượng Tiêu Hao Thực Tế': 0.0800, 'Tỷ Lệ Hao Hụt': 2.0, 'Tỷ Lệ Quy Đổi': 1.0 },
+      ]);
+
+      [1, 2, 3].forEach(id => {
+        const names = ['', 'ERP_TK152_Demo_1toN.xlsx', 'VNACCS_To_Khai_Demo.xlsx', 'BOM_Mapping_Demo.xlsx'];
+        const counts = ['', '8 bản ghi', '7 bản ghi', '7 bản ghi'];
+        document.getElementById(`status-tag-${id}`).textContent = 'Đã nạp';
+        document.getElementById(`status-tag-${id}`).className = 'text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded';
+        document.getElementById(`filename-${id}`).textContent = names[id];
+        document.getElementById(`rows-count-${id}`).textContent = counts[id];
+      });
+
+      logAuditAction('DATA_LOAD_DEMO', 'All Modules', 'Trống', 'Nạp bộ dữ liệu mẫu 1-to-N', 'Kế toán viên khởi tạo phiên kiểm tra với dữ liệu chuẩn UAT');
+
+      showToast('Đã nạp bộ dữ liệu mẫu 1-to-N vào RAM!', 'success');
+      switchTab('module1');
+      executeReconciliation();
+    }
+
+    /* ==========================================================================
+       MODULE 2: BCQT COUNTDOWN & 5-YEAR PCA AUDIT CHECKLIST
+       ========================================================================== */
+
+    let bcqtDeadlineDate = null;
+
+    function calculateBcqtDeadline() {
+      const fiscalDateInput = document.getElementById('bcqt-fiscal-date');
+      const fiscalDateStr = fiscalDateInput.value;
+      if (!fiscalDateStr) return;
+
+      const [year, month, day] = fiscalDateStr.split('-').map(Number);
+      
+      const fiscalDateUTC = new Date(Date.UTC(year, month - 1, day));
+      bcqtDeadlineDate = new Date(fiscalDateUTC.getTime() + (90 * 86400000));
+
+      const d = String(bcqtDeadlineDate.getUTCDate()).padStart(2, '0');
+      const m = String(bcqtDeadlineDate.getUTCMonth() + 1).padStart(2, '0');
+      const y = bcqtDeadlineDate.getUTCFullYear();
+
+      document.getElementById('bcqt-deadline-text').textContent = `${d}/${m}/${y} (23:59:59)`;
+      updateLiveBcqtClock();
+    }
+
+    function updateLiveBcqtClock() {
+      if (!bcqtDeadlineDate) return;
+
+      const now = new Date();
+      const diffMs = bcqtDeadlineDate.getTime() - now.getTime();
+
+      if (diffMs <= 0) {
+        document.getElementById('cd-days').textContent = '00';
+        document.getElementById('cd-hours').textContent = '00';
+        document.getElementById('cd-minutes').textContent = '00';
+        document.getElementById('cd-seconds').textContent = '00';
+        return;
+      }
+
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      document.getElementById('cd-days').textContent = String(days).padStart(2, '0');
+      document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
+      document.getElementById('cd-minutes').textContent = String(minutes).padStart(2, '0');
+      document.getElementById('cd-seconds').textContent = String(seconds).padStart(2, '0');
+    }
+
+    function updatePcaScore() {
+      const checkboxes = document.querySelectorAll('.pca-check');
+      let score = 0;
+      let totalWeight = 0;
+
+      checkboxes.forEach(cb => {
+        const weight = Number(cb.dataset.weight || 10);
+        totalWeight += weight;
+        if (cb.checked) {
+          score += weight;
+        }
+      });
+
+      [1, 2, 3, 4].forEach(i => {
+        const chk = document.getElementById(`risk-chk-${i}`);
+        totalWeight += 10;
+        if (chk && chk.checked) {
+          score += 10;
+        }
+      });
+
+      const normalizedScore = Math.min(100, Math.round((score / totalWeight) * 100));
+
+      const numEl = document.getElementById('pca-score-num');
+      const badgeEl = document.getElementById('pca-score-badge');
+      const barEl = document.getElementById('pca-score-bar');
+
+      numEl.textContent = `${normalizedScore}/100`;
+      barEl.style.width = `${normalizedScore}%`;
+
+      if (normalizedScore >= 70) {
+        badgeEl.textContent = 'BÁO ĐỘNG ĐỎ';
+        badgeEl.className = 'text-xs font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800';
+        numEl.className = 'text-2xl font-black text-rose-600';
+        barEl.className = 'bg-rose-600 h-full rounded-full transition-all';
+      } else if (normalizedScore >= 40) {
+        badgeEl.textContent = 'RỦI RO TRUNG BÌNH';
+        badgeEl.className = 'text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800';
+        numEl.className = 'text-2xl font-black text-amber-600';
+        barEl.className = 'bg-amber-500 h-full rounded-full transition-all';
+      } else {
+        badgeEl.textContent = 'AN TOÀN / THẤP';
+        badgeEl.className = 'text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800';
+        numEl.className = 'text-2xl font-black text-emerald-600';
+        barEl.className = 'bg-emerald-500 h-full rounded-full transition-all';
+      }
+    }
+
+    /* ==========================================================================
+       MODULE 3: FINANCIAL EXPOSURE & MULTI-STAGE PARTIAL PAYMENT CALCULATOR
+       Strict formula: 0.0003 per day (Art 59 Law 38/2019/QH14)
+       ========================================================================== */
+
+    function initDates() {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      const endDateInput = document.getElementById('calc-end-date');
+      if (endDateInput) endDateInput.value = todayStr;
+
+      const slaDateInput = document.getElementById('sla-decision-date');
+      if (slaDateInput) slaDateInput.value = todayStr;
+
+      const docDateInput = document.getElementById('doc-decision-date');
+      if (docDateInput) docDateInput.value = todayStr;
+    }
+
+    function togglePartialPayment() {
+      const hasPartial = document.getElementById('calc-has-partial').checked;
+      const inputsDiv = document.getElementById('partial-payment-inputs');
+      if (hasPartial) {
+        inputsDiv.classList.remove('hidden');
+      } else {
+        inputsDiv.classList.add('hidden');
+      }
+      calculateExposure();
+    }
+
+    function calculateExposure() {
+      const backTaxInput = document.getElementById('calc-back-tax');
+      const startDateInput = document.getElementById('calc-start-date');
+      const endDateInput = document.getElementById('calc-end-date');
+      const hasPartialChk = document.getElementById('calc-has-partial');
+      const partialAmountInput = document.getElementById('calc-partial-amount');
+      const partialDateInput = document.getElementById('calc-partial-date');
+      const penaltyRadio = document.querySelector('input[name="penalty-rate"]:checked');
+
+      const backTax = Math.max(0, Number(backTaxInput.value || 0));
+      const penaltyRate = penaltyRadio ? Number(penaltyRadio.value) : 0.20;
+
+      document.getElementById('formatted-back-tax').textContent = `${backTax.toLocaleString('vi-VN')} VNĐ`;
+
+      const startStr = startDateInput.value;
+      const endStr = endDateInput.value;
+      if (!startStr || !endStr) return;
+
+      const [sy, sm, sd] = startStr.split('-').map(Number);
+      const [ey, em, ed] = endStr.split('-').map(Number);
+
+      const startUTC = Date.UTC(sy, sm - 1, sd);
+      const endUTC = Date.UTC(ey, em - 1, ed);
+
+      const totalDiffDays = Math.max(0, Math.floor((endUTC - startUTC) / 86400000));
+      document.getElementById('badge-days-count').textContent = `Tổng trễ ${totalDiffDays.toLocaleString('vi-VN')} ngày`;
+
+      const hasPartial = hasPartialChk ? hasPartialChk.checked : false;
+      const partialAmount = hasPartial ? Math.min(backTax, Math.max(0, Number(partialAmountInput.value || 0))) : 0;
+      const partialDateStr = partialDateInput ? partialDateInput.value : '';
+
+      document.getElementById('formatted-partial-amount').textContent = `${partialAmount.toLocaleString('vi-VN')} VNĐ`;
+
+      let totalInterest = 0;
+      let remainingTax = backTax;
+      let scheduleHtml = '';
+      let savingsFromPartial = 0;
+
+      // Check if partial payment is active and falls within the interval
+      if (hasPartial && partialAmount > 0 && partialDateStr) {
+        const [py, pm, pd] = partialDateStr.split('-').map(Number);
+        const partialUTC = Date.UTC(py, pm - 1, pd);
+
+        if (partialUTC >= startUTC && partialUTC <= endUTC) {
+          // Stage 1: From start to partial payment date
+          const days1 = Math.max(0, Math.floor((partialUTC - startUTC) / 86400000));
+          const interest1 = Math.round(backTax * 0.0003 * days1);
+
+          // Stage 2: From partial payment date to final settlement date
+          remainingTax = Math.max(0, backTax - partialAmount);
+          const days2 = Math.max(0, Math.floor((endUTC - partialUTC) / 86400000));
+          const interest2 = Math.round(remainingTax * 0.0003 * days2);
+
+          totalInterest = interest1 + interest2;
+
+          // Savings compared to not paying partial:
+          const noPartialInterest = Math.round(backTax * 0.0003 * totalDiffDays);
+          savingsFromPartial = Math.max(0, noPartialInterest - totalInterest);
+
+          scheduleHtml = `
+            <tr>
+              <td class="py-1 font-bold text-slate-800">Giai đoạn 1</td>
+              <td class="py-1 text-slate-600">${startStr} &rarr; ${partialDateStr}</td>
+              <td class="py-1 text-center font-bold text-blue-700">${days1} ngày</td>
+              <td class="py-1 text-right">${backTax.toLocaleString('vi-VN')} VNĐ</td>
+              <td class="py-1 text-right text-rose-600 font-bold">${interest1.toLocaleString('vi-VN')} VNĐ</td>
+            </tr>
+            <tr class="bg-emerald-50/50">
+              <td class="py-1 font-bold text-emerald-800">Tạm ứng giữa kỳ</td>
+              <td class="py-1 text-emerald-700">Ngày ${partialDateStr}</td>
+              <td class="py-1 text-center font-bold text-emerald-700">-</td>
+              <td class="py-1 text-right text-emerald-700 font-bold">-${partialAmount.toLocaleString('vi-VN')} VNĐ</td>
+              <td class="py-1 text-right text-emerald-600 font-bold">Dừng tính lãi</td>
+            </tr>
+            <tr>
+              <td class="py-1 font-bold text-slate-800">Giai đoạn 2</td>
+              <td class="py-1 text-slate-600">${partialDateStr} &rarr; ${endStr}</td>
+              <td class="py-1 text-center font-bold text-blue-700">${days2} ngày</td>
+              <td class="py-1 text-right font-bold text-slate-800">${remainingTax.toLocaleString('vi-VN')} VNĐ</td>
+              <td class="py-1 text-right text-rose-600 font-bold">${interest2.toLocaleString('vi-VN')} VNĐ</td>
+            </tr>
+          `;
+        } else {
+          // Fallback single stage
+          totalInterest = Math.round(backTax * 0.0003 * totalDiffDays);
+          remainingTax = backTax;
+          scheduleHtml = `
+            <tr>
+              <td class="py-1 font-bold text-slate-800">Toàn kỳ</td>
+              <td class="py-1 text-slate-600">${startStr} &rarr; ${endStr}</td>
+              <td class="py-1 text-center font-bold text-blue-700">${totalDiffDays} ngày</td>
+              <td class="py-1 text-right">${backTax.toLocaleString('vi-VN')} VNĐ</td>
+              <td class="py-1 text-right text-rose-600 font-bold">${totalInterest.toLocaleString('vi-VN')} VNĐ</td>
+            </tr>
+          `;
+        }
+      } else {
+        totalInterest = Math.round(backTax * 0.0003 * totalDiffDays);
+        remainingTax = backTax;
+        scheduleHtml = `
+          <tr>
+            <td class="py-1 font-bold text-slate-800">Toàn kỳ</td>
+            <td class="py-1 text-slate-600">${startStr} &rarr; ${endStr}</td>
+            <td class="py-1 text-center font-bold text-blue-700">${totalDiffDays} ngày</td>
+            <td class="py-1 text-right">${backTax.toLocaleString('vi-VN')} VNĐ</td>
+            <td class="py-1 text-right text-rose-600 font-bold">${totalInterest.toLocaleString('vi-VN')} VNĐ</td>
+          </tr>
+        `;
+      }
+
+      const penalty = Math.round(backTax * penaltyRate);
+      const totalRemainingExposure = remainingTax + penalty + totalInterest;
+
+      // Update Breakdown UI
+      document.getElementById('breakdown-tax').textContent = `${remainingTax.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('breakdown-paid').textContent = `${partialAmount.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('breakdown-penalty').textContent = `${penalty.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('breakdown-interest').textContent = `${totalInterest.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('total-exposure-amount').textContent = `${totalRemainingExposure.toLocaleString('vi-VN')} VNĐ`;
+
+      document.getElementById('interest-schedule-tbody').innerHTML = scheduleHtml;
+      document.getElementById('savings-badge').textContent = `Tiết kiệm: ${savingsFromPartial.toLocaleString('vi-VN')} VNĐ tiền lãi`;
+
+      // Scenario comparisons
+      const scenarioA = totalRemainingExposure;
+      const scenarioB = backTax + Math.round(backTax * 0.20) + Math.round(backTax * 0.0003 * totalDiffDays);
+      const diffSavings = scenarioB - scenarioA;
+
+      document.getElementById('scenario-a-amount').textContent = `${scenarioA.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('scenario-b-amount').textContent = `${scenarioB.toLocaleString('vi-VN')} VNĐ`;
+      document.getElementById('scenario-diff-text').textContent = `Chi phí nếu bị phạt & không tạm ứng: +${diffSavings.toLocaleString('vi-VN')} VNĐ`;
+
+      const docTaxAmount = document.getElementById('doc-tax-amount');
+      if (docTaxAmount && backTax > 0) {
+        docTaxAmount.value = backTax.toLocaleString('vi-VN');
+      }
+    }
+
+    function setPresetDays(days) {
+      const startDateInput = document.getElementById('calc-start-date');
+      const now = new Date();
+      const pastDate = new Date(now.getTime() - (days * 86400000));
+
+      const py = pastDate.getUTCFullYear();
+      const pm = String(pastDate.getUTCMonth() + 1).padStart(2, '0');
+      const pd = String(pastDate.getUTCDate()).padStart(2, '0');
+
+      startDateInput.value = `${py}-${pm}-${pd}`;
+      initDates();
+      calculateExposure();
+      showToast(`Đã áp dụng preset ${days} ngày!`, 'info');
+    }
+
+    /* ==========================================================================
+       MODULE 4: STATUTORY SLA & DOCX GENERATOR
+       ========================================================================== */
+
+    function calculateSlaDeadlines() {
+      const decisionDateInput = document.getElementById('sla-decision-date');
+      const dateStr = decisionDateInput.value;
+      if (!dateStr) return;
+
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const decUTC = new Date(Date.UTC(y, m - 1, d));
+      const now = new Date();
+      const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // SLA 1: 90 days
+      const sla1End = new Date(decUTC.getTime() + (90 * 86400000));
+      const daysLeft1 = Math.floor((sla1End.getTime() - todayUTC) / 86400000);
+      formatSlaCard(1, daysLeft1, 90, sla1End);
+
+      // SLA 2: 30 days
+      const sla2End = new Date(sla1End.getTime() + (30 * 86400000));
+      const daysLeft2 = Math.floor((sla2End.getTime() - todayUTC) / 86400000);
+
+      // SLA 3: 365 days
+      const sla3End = new Date(decUTC.getTime() + (365 * 86400000));
+      const daysLeft3 = Math.floor((sla3End.getTime() - todayUTC) / 86400000);
+      formatSlaCard(3, daysLeft3, 365, sla3End);
+    }
+
+    function formatSlaCard(step, daysLeft, maxDays, endDate) {
+      const badge = document.getElementById(`sla-badge-${step}`);
+      const daysLeftEl = document.getElementById(`sla-days-left-${step}`);
+      const bar = document.getElementById(`sla-bar-${step}`);
+      const deadlineEl = document.getElementById(`sla-deadline-${step}`);
+
+      const d = String(endDate.getUTCDate()).padStart(2, '0');
+      const m = String(endDate.getUTCMonth() + 1).padStart(2, '0');
+      const y = endDate.getUTCFullYear();
+      deadlineEl.textContent = `${d}/${m}/${y}`;
+
+      if (daysLeft < 0) {
+        daysLeftEl.textContent = 'HẾT HẠN';
+        daysLeftEl.className = 'text-2xl font-black font-mono text-rose-600';
+        badge.textContent = 'ĐÃ QUÁ HẠN';
+        badge.className = 'text-xs font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-800';
+        bar.style.width = '0%';
+      } else {
+        daysLeftEl.textContent = daysLeft;
+        const pct = Math.max(0, Math.min(100, Math.round((daysLeft / maxDays) * 100)));
+        bar.style.width = `${pct}%`;
+
+        if (daysLeft <= 15) {
+          badge.textContent = 'CẬN HẠN (< 15 NGÀY)';
+          badge.className = 'text-xs font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800';
+          bar.className = 'bg-amber-500 h-full rounded-full transition-all';
+        } else {
+          badge.textContent = 'TRONG HẠN';
+          badge.className = 'text-xs font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800';
+          bar.className = 'bg-blue-600 h-full rounded-full transition-all';
+        }
+      }
+    }
+
+    async function generateComplaintDocx() {
+      showToast('Đang khởi tạo Đơn Khiếu Nại Hành Chính (.docx)...', 'info');
+
+      try {
+        const { Document, Packer, Paragraph, TextRun, AlignmentType } = window.docx;
+
+        const companyName = document.getElementById('doc-company-name').value;
+        const taxId = document.getElementById('doc-company-tax-id').value;
+        const address = document.getElementById('doc-company-address').value;
+        const repName = document.getElementById('doc-rep-name').value;
+        const customsAuthority = document.getElementById('doc-customs-authority').value;
+        const decisionNo = document.getElementById('doc-decision-no').value;
+        const decisionDate = document.getElementById('doc-decision-date').value;
+        const taxAmount = document.getElementById('doc-tax-amount').value;
+        const reason = document.getElementById('doc-reason').value;
+
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", bold: true, size: 24, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "Độc lập - Tự do - Hạnh phúc", bold: true, size: 26, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "-----------------------", size: 22, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({ text: "", spacing: { after: 200 } }),
+
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "ĐƠN KHIẾU NẠI HÀNH CHÍNH (LẦN ĐẦU)", bold: true, size: 30, font: "Times New Roman", color: "1A365D" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: `(V/v: Khiếu nại Quyết định số ${decisionNo} ngày ${decisionDate} của ${customsAuthority})`, italics: true, size: 22, font: "Times New Roman" }),
+                ],
+                spacing: { after: 300 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Kính gửi: ", bold: true, size: 24, font: "Times New Roman" }),
+                  new TextRun({ text: `Đồng chí Cục trưởng / Chi cục trưởng ${customsAuthority}`, bold: true, size: 24, font: "Times New Roman" }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "I. THÔNG TIN NGƯỜI KHIẾU NẠI:", bold: true, size: 24, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "- Tên doanh nghiệp: ", bold: true, font: "Times New Roman", size: 24 }),
+                  new TextRun({ text: companyName, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "- Mã số thuế: ", bold: true, font: "Times New Roman", size: 24 }),
+                  new TextRun({ text: taxId, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "- Trụ sở chính: ", bold: true, font: "Times New Roman", size: 24 }),
+                  new TextRun({ text: address, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "- Người đại diện theo pháp luật: ", bold: true, font: "Times New Roman", size: 24 }),
+                  new TextRun({ text: repName, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "II. QUYẾT ĐỊNH BỊ KHIẾU NẠI:", bold: true, size: 24, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `Quyết định số: ${decisionNo} do ${customsAuthority} ban hành ngày ${decisionDate}, ấn định số tiền thuế và tiền chậm nộp là: `, font: "Times New Roman", size: 24 }),
+                  new TextRun({ text: `${taxAmount} VNĐ.`, bold: true, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "III. CĂN CỨ PHÁP LÝ VÀ NỘI DUNG GIẢI TRÌNH KHIẾU NẠI:", bold: true, size: 24, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "1. Căn cứ pháp lý viện dẫn:", bold: true, italics: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "- Luật Khiếu nại số 02/2011/QH13 ngày 11/11/2011;\n- Luật Hải quan số 54/2014/QH13 ngày 23/06/2014;\n- Luật Quản lý thuế số 38/2019/QH14 ngày 13/06/2019;\n- Thông tư số 39/2018/TT-BTC sửa đổi, bổ sung Thông tư 38/2015/TT-BTC của Bộ Tài chính.", font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "2. Nội dung khiếu nại thực tế:", bold: true, italics: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: reason, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "IV. YÊU CẦU GIẢI QUYẾT KHIẾU NẠI:", bold: true, size: 24, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `Căn cứ các hồ sơ, định mức tiêu hao kỹ thuật và chứng từ xuất nhập khẩu đính kèm, Doanh nghiệp trân trọng đề nghị Quý Cơ quan xem xét, thẩm tra lại hồ sơ và hủy bỏ hoặc điều chỉnh Quyết định số ${decisionNo} theo đúng bản chất giao dịch sản xuất thực tế.`, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 300 }
+              }),
+
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "..., Ngày ..... tháng ..... năm 202...", italics: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "ĐẠI DIỆN THEO PHÁP LUẬT DOANH NGHIỆP", bold: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "(Ký, ghi rõ họ tên và đóng dấu)", italics: true, font: "Times New Roman", size: 22 }),
+                ],
+              }),
+            ],
+          }],
+        });
+
+        const blob = await Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Don_Khieu_Nai_HQ_${decisionNo.replace(/[^a-zA-Z0-9]/g, '_')}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        logAuditAction('DOCX_GENERATE', 'Đơn Khiếu Nại Hành Chính', 'None', `File Word: ${decisionNo}`, 'Kế toán xuất đơn khiếu nại phục vụ nộp cơ quan Hải quan');
+        showToast('Đã tạo và tải file Word Đơn Khiếu Nại!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast(`Lỗi tạo file Word: ${err.message}`, 'error');
+      }
+    }
+
+    async function generateExplanationDocx() {
+      showToast('Đang khởi tạo Công Văn Giải Trình Số Liệu (.docx)...', 'info');
+
+      try {
+        const { Document, Packer, Paragraph, TextRun, AlignmentType } = window.docx;
+
+        const companyName = document.getElementById('doc-company-name').value;
+        const taxId = document.getElementById('doc-company-tax-id').value;
+        const address = document.getElementById('doc-company-address').value;
+        const repName = document.getElementById('doc-rep-name').value;
+        const customsAuthority = document.getElementById('doc-customs-authority').value;
+        const reason = document.getElementById('doc-reason').value;
+
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: companyName.toUpperCase(), bold: true, size: 22, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: `Mã số thuế: ${taxId} - Trụ sở: ${address}`, italics: true, size: 20, font: "Times New Roman" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "-----------------------", size: 20, font: "Times New Roman" }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "CÔNG VĂN GIẢI TRÌNH SỐ LIỆU BÁO CÁO QUYẾT TOÁN & ĐỊNH MỨC", bold: true, size: 28, font: "Times New Roman", color: "1A365D" }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: "(Kèm theo Báo cáo quyết toán tình hình sử dụng nguyên liệu, vật tư - Mẫu số 15/BCQT-NVL/GSQL)", italics: true, size: 22, font: "Times New Roman" }),
+                ],
+                spacing: { after: 300 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Kính gửi: ", bold: true, size: 24, font: "Times New Roman" }),
+                  new TextRun({ text: customsAuthority, bold: true, size: 24, font: "Times New Roman" }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `Công ty chúng tôi xin gửi lời chào trân trọng đến Quý Chi cục. Thực hiện quy định tại Thông tư 39/2018/TT-BTC về việc lập và nộp Báo cáo quyết toán tình hình sử dụng nguyên liệu, vật tư nhập khẩu gia công/SXXK, Công ty xin giải trình chi tiết về số liệu chênh lệch giữa Sổ kế toán (TK 152) và Tờ khai hải quan như sau:`, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "1. Nguyên nhân kỹ thuật phát sinh chênh lệch:", bold: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: reason, font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 200 }
+              }),
+
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "2. Cam kết của Doanh nghiệp:", bold: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Toàn bộ số nguyên vật liệu nhập khẩu được đưa vào phục vụ trực tiếp quá trình sản xuất hàng xuất khẩu, không có hành vi thẩm lậu tiêu thụ nội địa trốn thuế. Doanh nghiệp chịu hoàn toàn trách nhiệm trước pháp luật về tính trung thực, chính xác của số liệu giải trình.", font: "Times New Roman", size: 24 }),
+                ],
+                spacing: { after: 300 }
+              }),
+
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "..., Ngày ..... tháng ..... năm 202...", italics: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "GIÁM ĐỐC DOANH NGHIỆP", bold: true, font: "Times New Roman", size: 24 }),
+                ],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({ text: "(Ký tên, đóng dấu)", italics: true, font: "Times New Roman", size: 22 }),
+                ],
+              }),
+            ]
+          }]
+        });
+
+        const blob = await Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Cong_Van_Giai_Trinh_BCQT_${taxId}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        logAuditAction('DOCX_GENERATE', 'Công Văn Giải Trình Số Liệu', 'None', `File Word: MST ${taxId}`, 'Kế toán xuất công văn giải trình nộp Chi cục Hải quan');
+        showToast('Đã tạo và tải file Word Công Văn Giải Trình!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast(`Lỗi tạo file Word: ${err.message}`, 'error');
+      }
+    }
+
+  </script>
+<footer style="background:#0b1f33;color:#cbd5e1;padding:28px 20px;text-align:center;font-family:system-ui,-apple-system,sans-serif;border-top:3px solid #f59e0b;">
+  <div style="max-width:820px;margin:0 auto;">
+    <div style="font-weight:800;color:#fff;font-size:15px;">CDMS — Customs Compliance, Data Reconciliation &amp; Audit Risk System</div>
+    <div style="margin-top:6px;font-size:12px;color:#94a3b8;">Bản demo / prototype · chạy hoàn toàn trong trình duyệt, không lưu dữ liệu.</div>
+    <div style="margin-top:14px;font-size:13px;color:#e2e8f0;">Thiết kế &amp; phát triển bởi <b style="color:#fbbf24;">Mr Quân</b> — chuyên gia Tài chính · Kế toán · Kiểm soát nội bộ, kết hợp nghiệp vụ hải quan/kiểm toán với công nghệ.</div>
+    <div style="margin-top:10px;font-size:13px;">
+      <a href="https://www.savafinlab.com.vn" style="color:#60a5fa;text-decoration:none;font-weight:600;" target="_blank" rel="noopener">Savafinlab — Tư vấn Tài chính, Thuế &amp; Kế toán</a>
+      &nbsp;·&nbsp; <span style="color:#94a3b8;">Liên hệ hợp tác / tư vấn qua website.</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
