@@ -200,10 +200,19 @@
       body { background: white !important; }
     }
   </style>
-<!-- SAVA-BRAND v1 (4 dòng): chèn lại sau mỗi lần cập nhật index.html từ bản gốc -->
-<link rel="icon" href="https://www.savafinlab.com.vn/brand/v1/logo-icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://www.savafinlab.com.vn/brand/v1/brand.css">
-<script src="https://www.savafinlab.com.vn/brand/v1/sava-bar.js" defer></script>
+<!-- SAVA-BRAND v2 (11/10/2026): chèn lại nguyên khối này trước </head> sau mỗi lần cập nhật index.html từ bản gốc -->
+<link rel="icon" href="https://www.savafinlab.com.vn/brand/v2/logo-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://www.savafinlab.com.vn/brand/v2/brand.css">
+<script src="https://www.savafinlab.com.vn/brand/v2/sava-bar.js" defer></script>
+<meta name="theme-color" content="#0B1B3F">
+<style id="sava-brand-v2">
+  /* Chữ: Inter theo brand Savafinlab (thay Plus Jakarta Sans của bản gốc) */
+  body, .font-sans { font-family: var(--sava-font) !important; }
+  /* Ô biểu tượng CDMS trên header: bỏ gradient vàng hổ phách, dùng navy-3 của hệ thống */
+  header .bg-gradient-to-br.from-amber-400 { background: var(--sava-navy-3) !important; color: #fff !important; }
+  /* Màu vàng/hổ phách còn lại trong app là màu trạng thái "cảnh báo" — giữ nguyên */
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
 <sava-bar product="Sava CDMS"></sava-bar>
@@ -3085,13 +3094,13 @@
     }
 
   </script>
-<footer style="background:#0b1f33;color:#cbd5e1;padding:28px 20px;text-align:center;font-family:system-ui,-apple-system,sans-serif;border-top:3px solid #f59e0b;">
+<footer style="background:#0B1B3F;color:#C8D1E3;padding:28px 20px;text-align:center;font-family:var(--sava-font,system-ui,sans-serif);border-top:3px solid #C0262D;">
   <div style="max-width:820px;margin:0 auto;">
     <div style="font-weight:800;color:#fff;font-size:15px;">CDMS — Customs Compliance, Data Reconciliation &amp; Audit Risk System</div>
     <div style="margin-top:6px;font-size:12px;color:#94a3b8;">Bản demo / prototype · chạy hoàn toàn trong trình duyệt, không lưu dữ liệu.</div>
-    <div style="margin-top:14px;font-size:13px;color:#e2e8f0;">Thiết kế &amp; phát triển bởi <b style="color:#fbbf24;">Mr Quân</b> — chuyên gia Tài chính · Kế toán · Kiểm soát nội bộ, kết hợp nghiệp vụ hải quan/kiểm toán với công nghệ.</div>
+    <div style="margin-top:14px;font-size:13px;color:#e2e8f0;">Thiết kế &amp; phát triển bởi <b style="color:#fff;">Mr Quân</b> — chuyên gia Tài chính · Kế toán · Kiểm soát nội bộ, kết hợp nghiệp vụ hải quan/kiểm toán với công nghệ.</div>
     <div style="margin-top:10px;font-size:13px;">
-      <a href="https://www.savafinlab.com.vn" style="color:#60a5fa;text-decoration:none;font-weight:600;" target="_blank" rel="noopener">Savafinlab — Tư vấn Tài chính, Thuế &amp; Kế toán</a>
+      <a href="https://www.savafinlab.com.vn" style="color:#fff;text-decoration:none;font-weight:600;" target="_blank" rel="noopener"><span style="font-family:'JetBrains Mono',Consolas,monospace;font-weight:700;">sava<span style="color:#FF7A6B;">finlab</span></span> — Tư vấn Tài chính, Thuế &amp; Kế toán</a>
       &nbsp;·&nbsp; <span style="color:#94a3b8;">Liên hệ hợp tác / tư vấn qua website.</span>
     </div>
   </div>
